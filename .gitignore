@@ -1,0 +1,6 @@
+# Runtime data — never commit (contains databases, tokens, credentials)
+dispatcharr/
+jellyfin/
+recordings/
+.env
+.env.*

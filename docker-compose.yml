@@ -1,0 +1,58 @@
+services:
+  dispatcharr:
+    image: ghcr.io/dispatcharr/dispatcharr:latest
+    container_name: dispatcharr
+    restart: unless-stopped
+    ports:
+      - "9191:9191"
+    volumes:
+      - ./dispatcharr/data:/data
+      # DVR output lands on the big disk; Jellyfin can read it via /recordings
+      - /mnt/storage/recordings:/data/recordings_host
+    # Intel Iris Xe (TigerLake) — enables VAAPI stream profiles
+    devices:
+      - /dev/dri:/dev/dri
+    environment:
+      - DISPATCHARR_ENV=aio
+      - REDIS_HOST=localhost
+      - CELERY_BROKER_URL=redis://localhost:6379/0
+      - DISPATCHARR_LOG_LEVEL=info
+    networks:
+      - media-net
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9191/api/core/ping/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+  jellyfin:
+    image: jellyfin/jellyfin:latest
+    container_name: jellyfin
+    restart: unless-stopped
+    ports:
+      - "8096:8096"
+      # Client auto-discovery
+      - "7359:7359/udp"
+    volumes:
+      - ./jellyfin/config:/config
+      - ./jellyfin/cache:/cache
+      - /mnt/storage/recordings:/recordings
+      - /mnt/storage/movies:/movies
+      - /mnt/storage/tv:/tv
+    # Intel Iris Xe (TigerLake) — enables VAAPI hardware transcoding
+    devices:
+      - /dev/dri:/dev/dri
+    networks:
+      - media-net
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8096/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+networks:
+  media-net:
+    name: media-net
+    driver: bridge
