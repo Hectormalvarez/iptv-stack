@@ -28,14 +28,14 @@ The provider's EPG channel IDs don't match the M3U `tvg-id`s, so the guide shows
 
 ## Jellyfin Live TV hookup
 
-Use the **container names** over `media-net` (traffic stays internal):
+Use the **container names** over `media-net` (traffic stays internal). Jellyfin's Live TV is configured as:
 
-- Tuner M3U: `http://dispatcharr:9191/m3u/streamevents/username=<dispatcharr-username>`
-- Guide XMLTV: same base with `/xmltv/...`
+- **Tuner: "M3U Tuner"** → `http://dispatcharr:9191/get.php?username=<dispatcharr-user>&password=<xc-token>&type=m3u_plus&output=ts`
+- **Guide: XMLTV provider** → `http://dispatcharr:9191/xmltv.php?username=<dispatcharr-user>&password=<xc-token>`
 
-(Get the exact endpoints from Dispatcharr: Channels page → "M3U" / "EPG" link buttons at top.)
+The `xc-token` is the per-user XC API password in Dispatcharr (Users → user → set/generate "xc_password"; it is separate from the login password). The plain `/hdhr` endpoint returns 401 without HDHR device auth — do not use it.
 
-Then Jellyfin → Dashboard → Live TV → add "M3U Tuner" + "XMLTV" guide, map categories, enable.
+Then Jellyfin → Dashboard → Live TV → "Refresh Guide Data" (the 84 MB XMLTV with ~14k channels takes a few minutes).
 
 ## Hardware transcoding (VAAPI, Intel Iris Xe)
 
