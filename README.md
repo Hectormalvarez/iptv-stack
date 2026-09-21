@@ -422,10 +422,37 @@ discovered CEC device but the remote does nothing.
   no adapter attached), `--apply-vizio` = back up the XML + patch the setting (stops/starts Kodi
   itself). The generic LE 12.2.x caveats above still apply.
 
-**Vizio remotes are (most likely) Bluetooth, and that decides the FLIRC question.** Vizio SmartCast
-remotes pair over Bluetooth and several models have no IR emitter, so FLIRC cannot learn them — CEC
-is then the *only* way to use the TV remote. Quick test: point the remote away from the TV (or cover
-its front) and press volume — if it still works, it is Bluetooth, and FLIRC is out.
+**If a Vizio remote is Bluetooth, FLIRC cannot learn it** — Vizio SmartCast remotes pair over
+Bluetooth and several models have no IR emitter at all, so CEC would be the *only* way to use the TV
+remote. Test any remote by pointing it away from the TV (or covering its front) and pressing volume:
+if it still works it is Bluetooth. Also note many BT remotes only emit IR for power/volume/input, so
+FLIRC would learn those buttons and nothing else. **This model is the exception — see below.**
+
+#### V505-H9 (this TV — manual-verified 2026-09-21)
+
+Checked the official V5-Series 2020 manual PDF directly (`cdn.vizio.com`, V505-H9 is covered):
+
+- **CEC menu path confirmed:** *Menu → System → CEC* ("Adjusting the CEC Settings", p.24).
+- **The manual never mentions Bluetooth, pairing, voice or microphone anywhere** (~726 KB of
+  extracted text, 0 hits) — so this set ships with the **IR-only remote**, and the observed
+  "I have to point it for it to work" confirms IR rather than Bluetooth. Every button must therefore
+  be IR, since the TV has no Bluetooth remote pairing at all.
+- **Consequence: FLIRC *is* viable here** (the earlier concern about Bluetooth remotes does not
+  apply to this model), and it is now the best effort/benefit option: ~$25, no soldering, no CEC
+  involvement, immune to the LE 12.2.x libCEC regression, and it works in Kodi *and* pre-boot.
+  Sanity check any remote with a phone's **front** camera (most rear cameras filter IR): an IR LED
+  shows as a white/purple flash on the screen when you press a button.
+- CEC still has one thing FLIRC cannot do: let **Kodi power the TV/AVR on and off and switch
+  inputs**. On this TV that means enabling the CEC menu above *and* applying the Playback
+  device-type fix. V-series CEC key pass-through is unverified (the reports above are P-series).
+
+**Recommended order for this box (IR remote + willing to solder):**
+1. **FLIRC (~$25, no soldering)** — learns the Vizio remote's IR codes, presents as HID keyboard.
+2. **DIY IR → HID (~$8–10, solder)** — Pro Micro/RP2040 + VS1838B IR receiver + an IR-decode →
+   HID-keyboard sketch does the same job for less money, with real firmware work. Same line-of-sight
+   requirement as FLIRC, since the emitter must see the receiver.
+3. **CEC (pico-cec DIY or Pulse-Eight)** — only worth it for Kodi→TV/AVR power and input switching,
+   which is FLIRC's blind spot; otherwise it adds the LE 12.2.x libCEC risk for no extra control.
 
 ### DIY alternative: pico-cec (CEC → USB HID keyboard, ~$15–20 in parts)
 
