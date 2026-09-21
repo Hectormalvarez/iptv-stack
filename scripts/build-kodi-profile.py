@@ -216,15 +216,103 @@ for number, group, exact, clean in EVENTS:
     renames[ch.id] = clean
     resolved.append((number, group, ch))
 
-print(f'resolved {len(resolved)} channels, {len(missing)} unresolved\n')
+print(f'resolved {len(resolved)} curated channels, {len(missing)} unresolved')
+
+# ---------------------------------------------------------------------------
+# Bulk imports: take every visible channel from the provider groups below and
+# re-home it into a clean Kodi group with its own number range. Mexican
+# channels only for the Latin side (LA|/AR|/RD| groups are deliberately left
+# out), plus the full sports set.
+# ---------------------------------------------------------------------------
+SPORTS_IMPORTS = [
+    (['SPORT ON AIR'],                            'Sports: International', 2701),
+    (['US| SPORT', 'BALLY'],                      'Sports: Networks',      2001),
+    (['NBA'],                                     'Sports: NBA',           2201),
+    (['NFL'],                                     'Sports: NFL',           2251),
+    (['MLB'],                                     'Sports: MLB',           2301),
+    (['NHL'],                                     'Sports: NHL',           2351),
+    (['NCAAF', 'NCAAB', 'BTN'],                   'Sports: College',       2401),
+    (['UEFA', 'SOCCER', 'FLO SPORTS'],            'Sports: Soccer',        2451),
+    (['TENNIS', 'GOLF'],                          'Sports: Golf & Tennis', 2501),
+    (['RACING', 'MOTOR', 'NASCAR'],               'Sports: Motorsport',    2551),
+    (['UFC', 'WWE', 'BOXING', 'FIGHT'],           'Sports: Combat',        2601),
+    (['PARAMOUNT+ PPV', 'ESPN+ PPV', 'PPV EVENT',
+      'B/R MAX'],                                 'Sports: Events',        3301),
+]
+
+# VIP must be matched before plain 'MX| MEXICO', which is a substring of it
+MX_IMPORTS = [
+    (['MX| MEXICO ⱽᴵᴾ'],   'Mexico VIP',    1201),
+    (['MX| MEXICO'],       'Mexico',        801),
+    (['MX| VIX'],          'Mexico: VIX',   841),
+]
+
+imported = []
+used_numbers = {n for n, _, _ in resolved}
+
+
+def import_group(matchers, kodi_group, base, pools):
+    """Pull all visible channels from matching provider groups / name prefix."""
+    picked = []
+    for ch in pools:
+        if ch.id in seen:
+            continue
+        gname = (ch.effective_channel_group_obj.name if ch.effective_channel_group_obj else '')
+        up = gname.upper()
+        if any(m.upper() in up for m in matchers):
+            picked.append(ch)
+    if not picked:
+        return
+    number = base
+    for ch in sorted(picked, key=lambda c: (c.name or '').lower()):
+        while number in used_numbers:
+            number += 1
+        used_numbers.add(number)
+        seen.add(ch.id)
+        imported.append((number, kodi_group, ch))
+        number += 1
+
+
+vis_all = list(qs.order_by('name'))
+for matchers, kodi_group, base in SPORTS_IMPORTS:
+    import_group(matchers, kodi_group, base, vis_all)
+
+# Mexican channels that sit outside the MX| groups (named 'MX: ...')
+mx_prefixed = [c for c in vis_all
+               if c.id not in seen and (c.name or '').upper().startswith('MX:')]
+number = 801
+for ch in sorted(mx_prefixed, key=lambda c: (c.name or '').lower()):
+    while number in used_numbers:
+        number += 1
+    used_numbers.add(number)
+    seen.add(ch.id)
+    imported.append((number, 'Mexico', ch))
+    number += 1
+
+for matchers, kodi_group, base in MX_IMPORTS:
+    import_group(matchers, kodi_group, base, vis_all)
+
+allrows = resolved + imported
+print(f'imported {len(imported)} extra channels; total {len(allrows)}\n')
+print('--- explicit picks (curated) ---')
 last_group = None
 for number, group, ch in resolved:
     if group != last_group:
-        print(f'--- {group} ---')
+        print(f'  == {group}')
         last_group = group
     old_g = ch.effective_channel_group_obj
     tag = f' -> rename "{renames[ch.id]}"' if ch.id in renames else ''
-    print(f'  {number:>3}  {ch.name[:50]:<50} (was #{ch.channel_number} {old_g.name[:16] if old_g else "-"}){tag}')
+    print(f'   {number:>5}  {ch.name[:44]:<44} (was #{ch.channel_number}{tag})')
+
+print('--- bulk imports (count + samples) ---')
+by_group = {}
+for number, group, ch in imported:
+    by_group.setdefault(group, []).append((number, ch))
+for group in sorted(by_group):
+    rows = sorted(by_group[group])
+    print(f'  == {group}: {len(rows)} channels, numbers {rows[0][0]}..{rows[-1][0]}')
+    for number, ch in rows[:3]:
+        print(f'         e.g. {number} {ch.name[:46]}')
 for number, group, aliases in missing:
     print(f'  MISSING {number} {group} {aliases}')
 
@@ -233,7 +321,7 @@ if DRY_RUN:
 else:
     profile, _ = ChannelProfile.objects.get_or_create(name=PROFILE_NAME)
     groups = {}
-    for number, group, ch in resolved:
+    for number, group, ch in allrows:
         if group not in groups:
             groups[group], _ = ChannelGroup.objects.get_or_create(name=group)
         ch.channel_number = number
@@ -243,7 +331,7 @@ else:
         ch.save()
         ChannelProfileMembership.objects.update_or_create(
             channel_profile=profile, channel=ch, defaults={'enabled': True})
-    keep_ids = [ch.id for _, _, ch in resolved]
+    keep_ids = [ch.id for _, _, ch in allrows]
     disabled = (ChannelProfileMembership.objects.filter(channel_profile=profile)
                 .exclude(channel_id__in=keep_ids).update(enabled=False))
     print(f'\nprofile {profile.id} "{profile.name}"')

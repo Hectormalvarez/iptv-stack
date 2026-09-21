@@ -112,9 +112,29 @@ The box does **not** get all 3,590 channels. Dispatcharr serves it a curated
 | 501–507 | Kids | Nickelodeon, Nick Jr, Disney, Disney Jr, Cartoon Network, Boomerang, PBS Kids |
 | 601–604 | Movies | Starz, Showtime, MoviePlex, TCM |
 | 701–704 | Spanish | Univision (Miami), Telemundo 51, Fox Deportes, TUDN Zona |
+| 801–849 | Mexico / Mexico: VIX | `MX:`-prefixed Mexican channels plus the provider's `MX| VIX` group |
+| 1201–1933 | **Mexico VIP** | whole `MX| MEXICO ⱽᴵᴾ` group (733 channels) |
+| 2001–2119 | **Sports: Networks** | `US| SPORT` + `BALLY` groups — RSNs (YES, SNY, MSG, Bally, Altitude, Monumental, AT&T SportsNet…), CBS Sports, etc. |
+| 2201+ / 2251+ / 2301+ / 2351+ | Sports: NBA / NFL / MLB / NHL | league networks + event slots |
+| 2401+ / 2451+ / 2501+ / 2551+ / 2601+ | Sports: College / Soccer / Golf & Tennis / Motorsport / Combat | |
+| 2701–3189 | **Sports: International** | whole `8K\| SPORT ON AIR` group (489) — international sports feeds (M+, DAZN, Prima Sport, Sky…) |
+| 3301–3388 | **Sports: Events** | `PARAMOUNT+ PPV`, `ESPN+ PPV`, `PPV EVENT`, `B/R MAX` event slots |
 
-Result on the box: **123 channels / ~3,000 EPG entries** instead of 3,590 / 84,000
-— the guide loads instantly and number entry zaps directly ("1 0 1" → KXAN).
+Expansion (2026-09-21, on request): **1,668 channels / 32,133 EPG entries** — the whole visible
+sports estate plus Mexican channels. Deliberately excluded: the other Latin groups
+(`LA|`, `AR|` — note `AR|` is Arabic, not Argentina — and `RD|`) because only Mexican channels were
+wanted, and the ~2,780 hidden sports event feeds that have **no EPG at all** (they would appear as
+blank guide rows; they can be added later by un-hiding them in Dispatcharr). Verified on the box:
+1,668 channels in 22 groups, a Mexican channel (`MX: AMC`) played normally, 0 errors, no new
+segfaults.
+
+To extend: add entries to `SPORTS_IMPORTS` / `MX_IMPORTS` in `scripts/build-kodi-profile.py`
+(matcher list, Kodi group, first channel number) — each import block must not overlap another
+group's range, so give it its own slack.
+
+Result on the box: the lineup started at **123 channels / ~3,000 EPG entries** (vs 3,590 / 84,000
+unfiltered) and now sits at **1,668 channels / 32,133 EPG entries** after the sports + Mexico
+expansion. Number entry zaps directly ("1 0 1" → KXAN).
 
 Client endpoints (these are what `pvr.iptvsimple` uses):
 
