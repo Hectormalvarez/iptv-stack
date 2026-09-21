@@ -91,17 +91,70 @@ Nightly Dispatcharr backups: `./dispatcharr/data/backups/` — copy these off-bo
 | Component | Source | Notes |
 |---|---|---|
 | `jellyfin-kodi` 2.2.0 | repo.jellyfin.org (manual zip) | deps vendored: requests+urllib3 1.26.16, certifi, idna, charset_normalizer (PyPI), websocket, typing_extensions, unidecode, simplecache, simpleeval |
-| `pvr.iptvsimple` | preinstalled | instance 1 → `http://usrv-01:9191/output/m3u?direct=true&output_profile=1` + `/output/epg`, refresh 51 min |
+| `pvr.iptvsimple` | preinstalled | instance 1 → **proxied** `http://usrv-01:9191/output/m3u` + `/output/epg`, refresh 51 min (do **not** use `direct=true` — see below) |
 | `skin.estuary.modv2` 21.4 | b-jesch GitHub (Omega branch) | needs script.skinshortcuts 2.0.3 + pvr.artwork + image.resource.select |
 | Wi-Fi power-save | off (runtime + systemd unit `wifi-powersave-off.service` in `/storage/.config/system.d/`) | fixes periodic drop-offs |
-| `pvr.iptvsimple` config | userdata | `catchupEnabled`, `allChannelsCatchupMode=4` (XC), `catchupDays=5`, `timeshiftEnabled=true` (HTTP) |
+| `pvr.iptvsimple` config | userdata | `catchupEnabled=false`, `allChannelsCatchupMode=0`, `timeshiftEnabled=false` — deliberately off, see below. Backups: `/storage/backups/instance-settings-1.xml.pre-proxy-fix-*` |
 | `guisettings.xml` tweaks | userdata | `pvrmanager.usebackendchannelnumbers=true`, `pvrplayback.confirmchannelswitch=false` (instant zap) |
 
-### Catchup & timeshift
+### Stream path: always proxy through Dispatcharr (fixed 2026-09-21)
 
-- **Catchup**: XC mode generates strong8k timeshift URLs from the guide — select any past program (≤5 days) in the guide and play it as if live. Works because stream URLs are direct XC (`cf.vovu.top/live/...ts`), not proxied.
-- **Timeshift**: `inputstream.ffmpegdirect` (preinstalled) buffers HTTP streams — pause/rewind live TV, seeking only back to when you started watching.
-- Edit these in `userdata/addon_data/pvr.iptvsimple/instance-settings-1.xml`, then `systemctl restart kodi`.
+The client previously fetched streams **direct** (`direct=true`), i.e. Kodi connected straight to
+`cf.vovu.top` with Kodi's own User-Agent. That caused random 502s and crashes because of two
+provider-side facts, both verified:
+
+1. The STRONG8K account allows **one simultaneous connection** (`M3UAccount.max_streams = 1`).
+   Kodi's playback plus its extra probe requests (`CCurlFile::Exists`) plus Jellyfin's tuner all
+   competed for that single slot.
+2. The provider pins the **User-Agent** (`TiviMate/5.1.6 (Android 12)`). Requests with any other
+   UA return an empty 502 response.
+
+Pointing the client at `/output/m3u` (proxied, **no** `direct=true`) fixes both: Dispatcharr holds
+exactly one upstream connection with the correct UA, multiplexes all clients onto it, buffers ~5 s
+server-side, and serves the stream over the LAN. Verified: the box pulled
+`http://usrv-01:9191/proxy/ts/stream/<uuid>`, buffered (`buffer ready (86/4 chunks) -> active`),
+and played with no new `VideoPlayer` segfaults and zero log errors.
+
+### Why catchup and timeshift are OFF
+
+Both were enabled during setup and both are **crash sources here**:
+
+- **Catchup is impossible on this subscription.** The XC API reports `tv_archive=1` on **0 of
+  15,830** streams, and Dispatcharr's derived `Channel.is_catchup` is 0 channels. With catchup
+  enabled Kodi still builds timeshift URLs, gets 502s and freezes —
+  [pvr.iptvsimple#499 *"Using Catchup on unsupported channels causes kodi to crash/hang"*](https://github.com/kodi-pvr/pvr.iptvsimple/issues/499).
+- **Timeshift freezes Kodi Omega** —
+  [pvr.iptvsimple#760 *"Kodi (Omega) freeze and/or crash when using Timeshift"*](https://github.com/kodi-pvr/pvr.iptvsimple/issues/760), still open.
+  The crash backtrace we captured matched this path: `VideoPlayer` segfault with frames in
+  `inputstream.ffmpegdirect → CURL::Parse` and `pvr.iptvsimple.so.21.11.0`.
+
+The provider's *Xi* archive is re-checkable any time — if a future subscription advertises
+archives, re-enable catchup (`catchupEnabled=true`, `allChannelsCatchupMode=4`) since the XC
+catchup URL pattern then works.
+
+Time-shifted viewing instead comes from **Dispatcharr's DVR** (schedule recordings server-side;
+they appear in Jellyfin/Kodi through the jellyfin-kodi addon).
+
+### Verifying client changes headlessly
+
+The box can be tested without the TV:
+
+```bash
+# list channels, play one, confirm it is playing
+curl -s -u kodi:kodi -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"PVR.GetChannels","params":{"channelgroupid":"alltv","limits":{"start":0,"end":6}}}' http://192.168.1.181:8080/jsonrpc
+curl -s -u kodi:kodi -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":2,"method":"Player.Open","params":{"item":{"channelid":1402}}}' http://192.168.1.181:8080/jsonrpc
+curl -s -u kodi:kodi -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":3,"method":"Player.GetActivePlayers"}' http://192.168.1.181:8080/jsonrpc
+
+# crash check: compare before/after (must not increase)
+ssh root@192.168.1.181 'dmesg | grep -ci segfault; grep -cE ERROR /storage/.kodi/temp/kodi.log'
+
+# which URL the client actually plays (should be the Dispatcharr proxy, never cf.vovu.top)
+ssh root@192.168.1.181 'grep -oE "Live Stream URL: [^ ]*" /storage/.kodi/temp/kodi.log | tail -1'
+```
+
+Edit addon settings in `userdata/addon_data/pvr.iptvsimple/instance-settings-1.xml`, then
+`systemctl stop kodi; <edit>; systemctl start kodi` — stop Kodi first, otherwise it rewrites the
+file on exit.
 
 ### PVR behavior
 
