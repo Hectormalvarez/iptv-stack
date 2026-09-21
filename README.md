@@ -356,6 +356,55 @@ AF3 is alpha; extra ratings need a free OMDb/MDbList key in TMDb Helper settings
 term because **Estuary Mod V2 cannot run on Kodi 22 (Piers)** — it requires Skinshortcuts 2.x, which
 Piers replaces — while AF3 is maintained for both.
 
+### HDMI-CEC (investigated 2026-09-21 — hardware missing, software already complete)
+
+**Verdict: this box cannot do CEC as-is. It needs the Pulse-Eight USB-CEC Adapter ($48.58, in
+stock, SKU P8-USBCECv1). There is nothing to install — the whole software stack is present.**
+
+Verified on the box:
+- `cec-client -l` → **`Found devices: NONE`**; no `/dev/cec*`, no `/sys/class/cec`, no CEC module.
+- libCEC **7.1.1** installed (`/usr/lib/libcec.so.7.1.1`) with `cec-client`, `cec-ctl`,
+  `cec-compliance`, `cec-follower`, plus `/sys/module/cec` (kernel framework) — and `kodi.bin` is
+  built with libCEC (89 CEC symbols).
+- libCEC features compiled in: **`P8_USB, DRM, P8_detect`** → the Pulse-Eight USB adapter is
+  supported out of the box. `cec-client -t rpi` / `-t tcp` are rejected as *invalid device types*,
+  so the "Raspberry Pi as a network CEC bridge" trick is **not** available in this build.
+- `card0-HDMI-A-1` is the connected TV output. Intel Tiger Lake / Iris Xe implements no CEC at all
+  (Kodi wiki: "most HDMI ports on computers do not have integrated support for CEC"; Intel: "Intel
+  Graphics doesn't support CEC commands").
+- The DisplayPort/tunnelled path is also out: kernel 6.16.12 exposes `drm_dp_dpcd_*` but **no
+  `drm_dp_cec*`** symbols, i.e. DP-CEC over AUX is not compiled in. A DP→HDMI adapter with CEC will
+  not help without a custom kernel.
+
+**⚠ Known regression on exactly this LibreELEC version.** LE 12.2.x ships libcec 7.1.1 (LE 12.0/12.1
+had 4.0.7) and that broke CEC for Pulse-Eight users on x86-64 NUCs and even RPi4 — the tracking
+thread [forum.libreelec.tv/thread/30065](https://forum.libreelec.tv/thread/30065-x86-64-cec-broke-after-updating-to-le-12-2-0/)
+is unresolved. Symptoms: the adapter is detected and libCEC opens it, but the remote does nothing,
+and settings reset on reboot (*Connected to HDMI device* → TV, physical address overwritten, Kodi
+force-switching the TV to HDMI 1 during playback). Root-caused to libcec PR #706.
+
+Workarounds that worked for users:
+- Delete the settings file and let Kodi regenerate it:
+  `systemctl stop kodi; rm /storage/.kodi/userdata/peripheral_data/cec_CEC_Adapter.xml; reboot`
+- Set *Connected to HDMI device* to the real topology (e.g. AVR/amplifier) and the correct HDMI port.
+- Some users only got it working with the adapter on the TV's HDMI 1 / eARC port.
+- **LE 13 fixes it properly** (nightly 20260420 confirmed working; libcec reverted in PR #11599, then
+  bumped to **8.1.1** in PR #11612, merged 2026-07-29, which also adds multi-CEC-adapter support).
+  LE 13 ships when Kodi 22 (Piers) ships — not released yet, and Piers breaks Mod V2, so treat any
+  LE 13 move as a full client rebuild, not a free upgrade.
+- Do **not** pre-create a CEC settings file: a legacy/wrong one is itself a known failure mode.
+
+Wiring (when the adapter arrives):
+- USB → laptop, HDMI **in-line** between laptop and TV. It is passive (no repeater): total HDMI run
+  ≤~2 m at UHD / ≤5 m at 1080p, and it does not pass more than 4K60 4:2:0 8-bit — for 4K, do not run
+  it in-line; plug its HDMI into a spare TV input instead.
+- Gives: TV remote controls Kodi (**including Bluetooth-only remotes** like LG Magic Remote, which
+  FLIRC cannot learn), Kodi powers the TV/AVR on and off, input switching, AVR volume.
+- Does not give: anything when the TV is off, and Kore stays the better remote for typing/search.
+
+If $49 is not worth it: **FLIRC USB (~$25)** + any IR remote presents as a keyboard and needs no CEC,
+but adds no TV power/input switching and cannot learn Bluetooth remotes.
+
 ### Verifying client changes headlessly
 
 The box can be tested without the TV:
@@ -413,5 +462,9 @@ Estuary Mod V2 ships looking similar to stock Estuary — the customization is i
 
 ### Live TV in Kodi
 
-TV section → 3,590 channels in provider groups (US| PRIME, TUBI, PEACOCK...). Channel numbers come from Dispatcharr's `tvg-chno`. Kore (HTTP event server) works as the remote; FLIRC USB IR receiver is the recommended add for a real remote — it presents as a keyboard, map your buttons once in the Flirc GUI, works everywhere including pre-boot navigation.
+TV section → **1,668 curated channels** (see *Curated lineup for the client* above) in 22 groups
+(Austin Local, Entertainment, Sports + per-league sub-groups, Mexico VIP, …). Channel numbers come
+from Dispatcharr's `tvg-chno`. Kore (HTTP event server) works as the remote; FLIRC USB IR receiver is
+the cheap "real remote" add-on — it presents as a keyboard, map your buttons once in the Flirc GUI,
+works everywhere including pre-boot navigation. See *HDMI-CEC* above for the TV-remote option.
 
