@@ -94,18 +94,83 @@ Nightly Dispatcharr backups: `./dispatcharr/data/backups/` — copy these off-bo
 
 ## Kodi client (LibreELEC on Dell Latitude 5320)
 
-**Architecture:** Jellyfin-first for VOD (`jellyfin-kodi` addon syncs Movies/TV/Recordings/watch-state), `pvr.iptvsimple` for Live TV pointed at Dispatcharr's output endpoints. Kodi 21 Omega / LibreELEC 12.2.1.
+**Architecture:** Jellyfin-first for VOD (`jellyfin-kodi` addon syncs Movies/TV/Recordings/watch-state), `pvr.iptvsimple` for Live TV pointed at a **curated Dispatcharr channel profile**. Kodi 21 Omega / LibreELEC 12.2.1.
+
+### Curated lineup for the client (the "Kodi" channel profile)
+
+The box does **not** get all 3,590 channels. Dispatcharr serves it a curated
+**Channel Profile** whose playlist is defined in
+`scripts/build-kodi-profile.py` (dry-run by default; `DRY_RUN=False` applies it):
+
+| Range | Group | Contents |
+|---|---|---|
+| 101–106 | Austin Local | KXAN (NBC), FOX 7 (KTBC), KEYE (CBS), ABC stand-in (KTRK Houston — no KVUE feed on this provider), PBS, Spectrum News Austin |
+| 201–239 | Entertainment | YouTube-TV-style bundle: USA, TNT, TBS, FX/FXX, AMC, BBC America, Comedy Central, Syfy, Bravo, TBS-family, HGTV, Food, Discovery, History, A&E, Lifetime, Hallmark, TruTV, ID, Nat Geo, Animal Planet, Travel, Freeform, Oxygen, WE tv, IFC, Sundance, BET, CMT, MTV Live, Cooking, Destination America, Magnolia, Reelz, MotorTrend, Outdoor |
+| 301–319 | Sports | ESPN, ESPN 2/News/USA, CBS Sports, FOX Sports 1/2, beIN, Spectrum Sports 1, YES, SNY, MSG, Bally Ohio, Premier League, Willow Cricket, UFC, WWE, Fight Sports, Sky Sports F1 |
+| 321–367 | Sports: NFL / NBA / MLB / NHL / College / Golf & Tennis | league networks plus the provider's live game slots, renamed from `NBA 06 :`/`NFL  \| 02 -` to `NBA Live 1`/`NFL Live 2` etc. (verified to stream) |
+| 401–409 | News | CNN, Fox News, MSNBC, CNBC, Bloomberg, Newsmax, HLN, Weather Channel, BBC World |
+| 501–507 | Kids | Nickelodeon, Nick Jr, Disney, Disney Jr, Cartoon Network, Boomerang, PBS Kids |
+| 601–604 | Movies | Starz, Showtime, MoviePlex, TCM |
+| 701–704 | Spanish | Univision (Miami), Telemundo 51, Fox Deportes, TUDN Zona |
+
+Result on the box: **123 channels / ~3,000 EPG entries** instead of 3,590 / 84,000
+— the guide loads instantly and number entry zaps directly ("1 0 1" → KXAN).
+
+Client endpoints (these are what `pvr.iptvsimple` uses):
+
+```
+http://usrv-01:9191/output/m3u/Kodi
+http://usrv-01:9191/output/epg/Kodi
+```
+
+Jellyfin keeps the full `/output/m3u` + `/output/epg` (no profile) — the two
+clients are independent.
+
+**Changing the lineup:** edit the `LINEUP` list (number, group, aliases, prefer)
+or `EVENTS` (provider name → clean name) in `scripts/build-kodi-profile.py`, run
+the dry run to review the picks, then set `DRY_RUN=False` and re-run. The script
+is idempotent, so re-running is safe. Partial channels are fine — the resolver
+scores candidates (US feeds preferred, `PPV`/`24-7`/`test` excluded).
+
+**Watch out:** renaming/numbering here is global (Jellyfin's guide sees the same
+names/numbers). Also, `channel_number` is only unique *per group* in Dispatcharr,
+so always select the curated set **by group membership**, not by number range —
+provider channels in other groups already use numbers 101–704.
 
 ### What's installed
 
 | Component | Source | Notes |
 |---|---|---|
 | `jellyfin-kodi` 2.2.0 | repo.jellyfin.org (manual zip) | deps vendored: requests+urllib3 1.26.16, certifi, idna, charset_normalizer (PyPI), websocket, typing_extensions, unidecode, simplecache, simpleeval |
-| `pvr.iptvsimple` | preinstalled | instance 1 → **proxied** `http://usrv-01:9191/output/m3u` + `/output/epg`, refresh 51 min (do **not** use `direct=true` — see below) |
+| `pvr.iptvsimple` | preinstalled | instance 1 → **curated profile** `http://usrv-01:9191/output/m3u/Kodi` + `/output/epg/Kodi`, refresh 51 min (never `direct=true` — see below) |
 | `skin.estuary.modv2` 21.4 | b-jesch GitHub (Omega branch) | needs script.skinshortcuts 2.0.3 + pvr.artwork + image.resource.select |
 | Wi-Fi power-save | off (runtime + systemd unit `wifi-powersave-off.service` in `/storage/.config/system.d/`) | fixes periodic drop-offs |
-| `pvr.iptvsimple` config | userdata | `catchupEnabled=false`, `allChannelsCatchupMode=0`, `timeshiftEnabled=false` — deliberately off, see below. Backups: `/storage/backups/instance-settings-1.xml.pre-proxy-fix-*` |
+| `pvr.iptvsimple` config | userdata | `catchupEnabled=false`, `allChannelsCatchupMode=0`, `timeshiftEnabled=false` — deliberately off, see below. Backups: `/storage/backups/instance-settings-1.xml.pre-*` |
 | `guisettings.xml` tweaks | userdata | `pvrmanager.usebackendchannelnumbers=true`, `pvrplayback.confirmchannelswitch=false` (instant zap) |
+
+### Zapping on a single-connection subscription (fixed 2026-09-21)
+
+The STRONG8K account allows **one** simultaneous provider connection, so a
+channel switch is a race: Kodi requests the new channel before releasing the old
+stream, so the upstream slot is still occupied and Dispatcharr answers
+`503 {"error": "All active M3U profiles have reached maximum connection limits"}`.
+Two fixes, both applied:
+
+1. **Raise Dispatcharr's retry budget** — `apps/proxy/live_proxy/views.py`
+   hardcodes `retry_timeout = 3` (with `retry_interval = 0.1`), which expired
+   ~55 ms before the old stream released. Run
+   `./scripts/patch-dispatcharr-zap-retry.sh` (idempotent; **re-run after every
+   Dispatcharr image update**) to raise it to 15 s.
+2. **Keep channels warm after the last client** — `proxy_settings` in
+   Dispatcharr's `CoreSettings`:
+   `channel_shutdown_delay: 0 → 3`, `channel_client_wait_period: 5 → 10`.
+   At 0 the channel is torn down the instant Kodi drops a connection, so Kodi's
+   retry hits `Channel ... unavailable. Teardown or pending shutdown` and gives
+   up; a few seconds keeps the buffer alive and the retry attaches instantly.
+
+Effect: switching takes a few seconds (black until the old slot releases) but
+succeeds instead of stopping playback. Raise `channel_shutdown_delay` for faster
+switch-back, at the cost of holding the single slot longer.
 
 ### Stream path: always proxy through Dispatcharr (fixed 2026-09-21)
 
