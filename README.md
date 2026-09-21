@@ -285,7 +285,46 @@ logos already come from Dispatcharr (`tvg-logo` → Kodi channel icons). Poster/
 enrichment additionally needs a **TMDB API key** (and optionally fanart.tv) entered in the module's
 settings — not configured yet.
 
+### Skin trial: Arctic Fuse 3 installed alongside Mod V2 (2026-09-21)
 
+`skin.arctic.fuse.3` 3.3.1 (jurialmunkey — the skin family most "customised Kodi boxes" run) is
+**installed but disabled**, so Mod V2 stays active until you switch at the TV. It has its own addon
+ID, so both coexist and every Mod V2 setting is untouched; falling back is just picking Mod V2 again.
+
+Installed into `/storage/.kodi/addons/`:
+
+| Addon | Version | Source |
+|---|---|---|
+| `repository.jurialmunkey` | 3.4 | `jurialmunkey.github.io/repository.jurialmunkey/repository.jurialmunkey-3.4.zip` |
+| `skin.arctic.fuse.3` | 3.3.1 | that repo → `omega/zips/skin.arctic.fuse.3/…-3.3.1.zip` |
+| `script.skinvariables` | 2.2.4 | repo |
+| `script.texturemaker` | 0.2.11 | repo |
+| `plugin.video.themoviedb.helper` | 6.17.3 | repo (widget/metadata engine) |
+| `script.module.jurialmunkey` | 0.2.35 | repo |
+| `script.module.infotagger` | 0.0.9 | repo |
+| `resource.font.robotocjksc` | 0.0.3 | repo — **its zip ships the folder misspelled** as `resource.font.robotcjksc`, renamed to match the declared ID or the skin's dependency is unmet |
+| `script.module.addon.signals` | 0.0.6+matrix.1 | `mirrors.kodi.tv/addons/omega/` |
+| `script.module.qrcode` | 6.1.0+matrix.3 | Kodi repo |
+| `resource.images.weathericons.white` | 0.0.6 | Kodi repo |
+| `resource.images.studios.coloured` | 0.0.24 | Kodi repo |
+
+`script.skinvariables`, `script.texturemaker` and `plugin.video.themoviedb.helper` were enabled via
+JSON-RPC (`Addons.SetAddonEnabled`). The skin was deliberately **not** enabled — switching skins
+headlessly is what left Mod V2 half-configured earlier, so that step belongs at the TV. Verified:
+`Addons.GetAddonDetails skin.arctic.fuse.3` → `broken: false` (all dependencies satisfied),
+active skin still `skin.estuary.modv2`, 0 log errors, no new segfaults.
+
+**To try it:** Settings → Interface → Skin → *Arctic Fuse 3*. First load runs its hub/shortcut
+setup and regenerates artwork, so it is slow once. Use ←/→ on the top bar for its hubs — the
+prebuilt **Live TV hub** is the natural home for the PVR side.
+**To revert:** Settings → Interface → Skin → *Estuary Mod V2*, or
+`Settings.SetSettingValue {"setting":"lookandfeel.skin","value":"skin.estuary.modv2"}`.
+
+AF3 is alpha; extra ratings need a free OMDb/MDbList key in TMDb Helper settings. It matters long
+term because **Estuary Mod V2 cannot run on Kodi 22 (Piers)** — it requires Skinshortcuts 2.x, which
+Piers replaces — while AF3 is maintained for both.
+
+### Verifying client changes headlessly
 
 The box can be tested without the TV:
 
