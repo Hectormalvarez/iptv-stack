@@ -266,10 +266,22 @@ Applied via JSON-RPC `Settings.SetSettingValue`:
 
 Playback start is unchanged after this (measured 5 s from cold), zero new errors.
 
-**Jellyfin → Kodi sync.** Installed **Kodi Sync Queue 7.0.0.0** on the server
-(`POST /Packages/Installed/Kodi%20Sync%20Queue?version=7.0.0.0`, then restart Jellyfin), which
-Jellyfin's docs recommend with library mode so Kodi gets library changes without waiting for a
-periodic re-sync. Check with `GET /Plugins` (`"status": "Active"`).
+**Jellyfin → Kodi sync.** Installed **Kodi Sync Queue** on the server, which Jellyfin's docs
+recommend with library mode so Kodi gets library changes without waiting for a periodic re-sync.
+Use the version whose ABI matches the server — on Jellyfin 10.11.11 that is **15.0.0.0**; the
+catalog's 7.0.0.0 (ABI 10.8) installs but reports `NotSupported` and does nothing:
+
+```bash
+TOKEN=$(curl -s -X POST http://localhost:8096/Users/AuthenticateByName \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: MediaBrowser Client="cli", Device="cli", DeviceId="cli", Version="1.0"' \
+  -d '{"Username":"root","Pw":"<jellyfin-root-password>"}' | python3 -c 'import sys,json;print(json.load(sys.stdin)["AccessToken"])')
+curl -s -X POST 'http://localhost:8096/Packages/Installed/Kodi%20Sync%20Queue?version=15.0.0.0' \
+  -H "Authorization: MediaBrowser Token=\"$TOKEN\""      # then restart Jellyfin
+```
+
+Verify with `GET /Plugins` → `"status": "Active"`, and remove a stale
+`/config/plugins/Kodi Sync Queue_<oldversion>` folder if one is left behind.
 
 **Kodi config backups (box side).** Daily systemd timer on the box:
 - script `/storage/.config/kodi-config-backup.sh`
