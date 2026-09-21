@@ -46,7 +46,28 @@ Both containers have `/dev/dri` mounted. In Dispatcharr create a Stream Profile:
 
 In Jellyfin: Dashboard → Playback → Transcoding → enable VAAPI, device `/dev/dri/renderD128`.
 
-## DVR / Recordings
+## Channel cleanup (2026-09-21)
+
+14,936 → **3,590 visible channels, all with EPG**. Junk is *hidden* (`hidden_from_output=True`), never deleted — auto-sync keeps them updated and never re-creates them, and they can be un-hidden from the Channels page (filter "Hidden Only"). Hidden so far:
+
+1. Separator-name channels (`#####...#####`) — 147
+2. Channels with no streams — 1,118
+3. Dated one-shot PPV/event channels (name contains `(YYYY-MM-DD ...`) — 1,750
+4. All remaining channels without EPG — 8,346
+
+SQL equivalent (inside the container):
+
+```python
+from apps.channels.models import Channel
+Channel.objects.filter(name__regex=r'^#+').update(hidden_from_output=True)
+Channel.objects.filter(streams__isnull=True).update(hidden_from_output=True)
+Channel.objects.filter(name__regex=r'\(20[0-9]{2}-[0-9]{2}-[0-9]{2}').update(hidden_from_output=True)
+Channel.objects.filter(epg_data_id=None).update(hidden_from_output=True)
+```
+
+After cleanup: Jellyfin → Live TV → "Refresh Guide Data" (or Scheduled Tasks → Refresh Guide) so the tuner re-imports the shrunken playlist.
+
+
 
 - Dispatcharr DVR output → `/data/recordings_host` → host `/mnt/storage/recordings` → Jellyfin sees it at `/recordings`.
 
