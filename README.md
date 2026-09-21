@@ -115,6 +115,16 @@ Nightly Dispatcharr backups: `./dispatcharr/data/backups/` — copy these off-bo
 - Genre display: `useEpgGenreText=true` — guide shows provider EPG category text.
 - Channel logos: served by Dispatcharr (`/api/channels/logos/<id>/cache/`), verified HTTP 200.
 
+## Automation & sync (phase 2 proposal)
+
+Deployed:
+- **watchstate** (`:8081`) — watch-state sync between Jellyfin (and later other backends). Setup: open WebUI → create system user → add Jellyfin backend (two-way) → Dashboard → Webhooks → point at `http://watchstate:8081/ws/{key}`. Scheduled import runs hourly by default.
+- **Backups**: host cron (04:15 daily) → Dispatcharr backup zips + Jellyfin SQLite snapshot → `/mnt/storage/backups/iptv-stack/`, 7 DB snapshots retained.
+
+Not yet deployed (needs interactive setup + decisions):
+- **Prowlarr + Sonarr + Radarr + Seerr** (`linuxserver` images): indexers → automation → requests. Seerr (formerly Jellyseerr, now "seerr") gives discovery/requests UI wired to Jellyfin auth; Sonarr/Radarr download into `/mnt/storage/tv` and `/mnt/storage/movies` which Jellyfin + jellyfin-kodi pick up automatically. Requires an indexer/usenet/torrent source decision.
+
+
 
 ### Known gotchas
 
