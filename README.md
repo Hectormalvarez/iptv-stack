@@ -81,3 +81,32 @@ docker compose logs -f dispatcharr
 
 Dispatcharr admin account: `hadev` (password reset via `manage.py set_password` if lost).
 Nightly Dispatcharr backups: `./dispatcharr/data/backups/` — copy these off-box.
+
+## Kodi client (LibreELEC on Dell Latitude 5320)
+
+**Architecture:** Jellyfin-first for VOD (`jellyfin-kodi` addon syncs Movies/TV/Recordings/watch-state), `pvr.iptvsimple` for Live TV pointed at Dispatcharr's output endpoints. Kodi 21 Omega / LibreELEC 12.2.1.
+
+### What's installed
+
+| Component | Source | Notes |
+|---|---|---|
+| `jellyfin-kodi` 2.2.0 | repo.jellyfin.org (manual zip) | deps vendored: requests+urllib3 1.26.16, certifi, idna, charset_normalizer (PyPI), websocket, typing_extensions, unidecode, simplecache, simpleeval |
+| `pvr.iptvsimple` | preinstalled | instance 1 → `http://usrv-01:9191/output/m3u?direct=true&output_profile=1` + `/output/epg`, refresh 51 min |
+| `skin.estuary.modv2` 21.4 | b-jesch GitHub (Omega branch) | needs script.skinshortcuts 2.0.3 + pvr.artwork + image.resource.select |
+| Wi-Fi power-save | off (runtime + systemd unit `wifi-powersave-off.service` in `/storage/.config/system.d/`) | fixes periodic drop-offs |
+
+### Known gotchas
+
+- **Python module addons are not importable until Kodi restarts** after filesystem installation.
+- **skinshortcuts builds its include file on first skin load** — first switch may fail once, then retry.
+- Manual first-login in jellyfin-kodi 2.2.0 crashes with `KeyError: 'address'` (server_id unset); patched `connection_manager.get_server_info()` to fall back to the first saved server.
+- Web/JSON-RPC credentials on the box: `kodi`/`kodi` (kodi.log reveals them if changed).
+
+### Home screen curation (Mod V2)
+
+Estuary Mod V2 ships looking similar to stock Estuary — the customization is in **skin settings → Home menu / widgets**: pin *PVR (Now Playing / Next Up)* and *Continue Watching* rows (Jellyfin), favourites. On first run the skin wizard offers menu setup; re-run any time via long-press on a home item.
+
+### Live TV in Kodi
+
+TV section → 3,590 channels in provider groups (US| PRIME, TUBI, PEACOCK...). Channel numbers come from Dispatcharr's `tvg-chno`. Kore (HTTP event server) works as the remote; FLIRC USB IR receiver is the recommended add for a real remote — it presents as a keyboard, map your buttons once in the Flirc GUI, works everywhere including pre-boot navigation.
+
