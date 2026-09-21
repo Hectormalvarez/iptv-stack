@@ -52,6 +52,22 @@ services:
       timeout: 5s
       retries: 5
 
+  # Watch-state sync: keeps Jellyfin watched/progress state in sync
+  # (multi-user, webhook + scheduled import). WebUI: http://localhost:8081
+  # First run: create system user in the UI, then add Jellyfin backend
+  # (two-way sync) and point Jellyfin webhooks at http://watchstate:8081/ws/{key}
+  watchstate:
+    image: ghcr.io/arabcoders/watchstate:latest
+    container_name: watchstate
+    restart: unless-stopped
+    user: "1000:1000"
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./watchstate/data:/config
+    networks:
+      - media-net
+
 networks:
   media-net:
     name: media-net
