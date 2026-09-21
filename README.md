@@ -405,6 +405,64 @@ Wiring (when the adapter arrives):
 If $49 is not worth it: **FLIRC USB (~$25)** + any IR remote presents as a keyboard and needs no CEC,
 but adds no TV power/input switching and cannot learn Bluetooth remotes.
 
+### Vizio specifics (TV confirmed 2026-09-21)
+
+Vizio ignores a Kodi box that registers as a **Recording** device (libCEC/Kodi's default). On several
+Vizio models (P55-F1, PX65, P-Series Quantum, E-series) the fix is to register as **Playback** —
+reported by multiple users on the Kodi and LibreELEC forums; without it the TV lists Kodi as a
+discovered CEC device but the remote does nothing.
+
+- Kodi 21 stores this enum as its **label id**: `36051` Recording (default) → **`36052` Playback**
+  (`36053` Tuner). Kodi ≤19 stored the raw libCEC number (`1` → `4`) instead — verified against
+  `PeripheralCecAdapter.cpp` and `strings.po` for Omega.
+- Edit `/storage/.kodi/userdata/peripheral_data/usb_2548_1002_CEC_Adapter.xml` **with Kodi stopped**
+  (`systemctl stop kodi`), or the change is discarded when Kodi exits; then start Kodi and power-cycle
+  the TV / toggle CEC off-on so it re-reads the device.
+- **`scripts/cec-vizio-bringup.sh`** does this for you: no argument = read-only diagnostics (safe with
+  no adapter attached), `--apply-vizio` = back up the XML + patch the setting (stops/starts Kodi
+  itself). The generic LE 12.2.x caveats above still apply.
+
+**Vizio remotes are (most likely) Bluetooth, and that decides the FLIRC question.** Vizio SmartCast
+remotes pair over Bluetooth and several models have no IR emitter, so FLIRC cannot learn them — CEC
+is then the *only* way to use the TV remote. Quick test: point the remote away from the TV (or cover
+its front) and press volume — if it still works, it is Bluetooth, and FLIRC is out.
+
+### DIY alternative: pico-cec (CEC → USB HID keyboard, ~$15–20 in parts)
+
+[gkoh/pico-cec](https://github.com/gkoh/pico-cec) is the soldering project for exactly this problem: a
+microcontroller listens to the CEC bus and emits **USB HID keystrokes**, so Kodi just sees a keyboard.
+It needs **no driver, no libCEC and no kernel support — which sidesteps the LE 12.2.x libcec
+regression entirely**, and it works before Kodi starts. LibreELEC recognises it natively.
+
+BOM (prices as published Jan 2026):
+
+| Part | Note |
+|---|---|
+| Seeed Studio XIAO RP2350 (~$10.60 AUD) | reference board since Jan 2026; XIAO RP2040 also supported |
+| HDMI male/female passthrough test board, model **WP-905** (~$4.30 AUD) | the board the CEC pin is soldered to |
+| 4 short wires + 2× M3×10 and 2× M3×20 bolts | |
+| optional 3D-printed enclosure | STLs ship in the release zip (`pico-cec-{base,middle,pusher,top}.stl`) |
+
+- **Wiring:** XIAO pad `D3` → HDMI **pin 13 (CEC)**, `GND` → HDMI GND (≈pin 17); optionally HDMI pin 18
+  (5V) → `5V/VUSB`. Then PC HDMI → pico-cec → TV, plus USB to the PC.
+- **Firmware:** drag-and-drop UF2, no toolchain. `pico-cec-v0.8.0.zip` contains
+  `pico-cec-seeed_xiao_rp2350-v0.8.0.uf2` (and the RP2040 build).
+- **Good:** v0.2.2+ passes the Linux `cec-compliance` suite (survived an hour of fuzz testing); basic
+  user-control messages (arrows, select, …) map to Kodi shortcuts; **v0.4.0 added logical address +
+  device type settings** (directly relevant to the Vizio quirk) and v0.8.0 made the OSD name
+  configurable.
+- **Limits:** it is a keyboard, so Kodi cannot use it to power the TV/AVR or switch inputs — you get
+  remote→Kodi control only. It is passive in-line like the Pulse-Eight adapter, so the same ~2 m UHD /
+  5 m 1080p cable limits apply (v0.8.0 added an explicit 4K caution).
+- Boards the project supports: XIAO RP2350 (reference), XIAO RP2040, plain Pico (needs "RGB
+  unhacking"), Waveshare RP2040-Zero / CEC-Enabler.
+
+**Not viable on this box:** [impulse-cec](https://github.com/mkopec/impulse-cec) (ESP32-C6 / RP2350) is
+attractive on paper — it speaks the open **P8 protocol**, the same one libCEC and Kodi's Pulse-Eight
+path use — but integrating it needs either the kernel `pulse8-cec` driver + `inputattach` (neither
+exists on LibreELEC x86_64: `modinfo pulse8-cec` → not found, `inputattach` → not installed) or libCEC
+serial support with manual wiring. pico-cec is the low-risk DIY path here.
+
 ### Verifying client changes headlessly
 
 The box can be tested without the TV:
