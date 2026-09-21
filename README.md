@@ -223,7 +223,69 @@ catchup URL pattern then works.
 Time-shifted viewing instead comes from **Dispatcharr's DVR** (schedule recordings server-side;
 they appear in Jellyfin/Kodi through the jellyfin-kodi addon).
 
-### Verifying client changes headlessly
+### Startup, buffering, sync and backups (2026-09-21)
+
+**Startup — boots into the TV guide.** `lookandfeel.startupwindow = 10702` (TV Guide;
+window IDs from Kodi's `WindowIDs.h`: TV Channels 10700, TV Recordings 10701, **TV Guide 10702**,
+Timers 10703, Search 10704, Home 10000). `lookandfeel.startupaction = 0` (None) — set it to
+*Play TV* in Settings → Interface → Startup if you'd rather it starts playing immediately.
+Verified: after a Kodi restart, `XBMC.GetInfoLabels(["System.CurrentWindow"])` → `TV guide`.
+
+**Buffering — Kodi was not caching HTTP streams at all.** Kodi's default
+`filecache.buffermode = 4` is `CACHE_BUFFER_MODE_NETWORK`, and the decision in
+`xbmc/filesystem/File.cpp` is:
+
+```cpp
+if ((mode == CACHE_BUFFER_MODE_INTERNET      && IsInternetStream(path, true)) ||
+    (mode == CACHE_BUFFER_MODE_TRUE_INTERNET && IsInternetStream(path, false)) ||
+    (mode == CACHE_BUFFER_MODE_NETWORK       && IsNetworkFilesystem(path)) ||   // SMB/NFS only!
+    (mode == CACHE_BUFFER_MODE_ALL           && (IsNetworkFilesystem(path) || IsHD(path))))
+  m_flags |= READ_CACHED;
+```
+
+`IsNetworkFilesystem()` is true only for streamed filesystems/SMB/NFS, so **plain `http://` IPTV
+streams were never cached** with the default. The enum (from `filesystem/IFileTypes.h`) is
+deliberately non-sequential, which is why the GUI order is misleading:
+
+| GUI label | Value |
+|---|---|
+| Buffer all internet filesystems (FTP, WebDAV…) | 0 `INTERNET` |
+| Buffer all filesystems (incl. local) | 1 `ALL` |
+| **Only buffer true internet streams (HTTP, HTTPS)** | **2 `TRUE_INTERNET`** |
+| No buffer | 3 `NONE` |
+| Buffer all network filesystems (SMB, NFS) | 4 `NETWORK` ← Kodi default |
+
+Applied via JSON-RPC `Settings.SetSettingValue`:
+
+| Setting | Was | Now |
+|---|---|---|
+| `filecache.buffermode` | 4 (network filesystems — http uncached) | **2** (true internet → http/https cached) |
+| `filecache.memorysize` | 20 MB | **64 MB** |
+| `filecache.readfactor` | 400 (fixed 4x) | **0 = Adaptive** (aggressive while empty, ~1.5x when full) |
+| `filecache.chunksize` | 131072 (128 KB) | unchanged (already the sensible default) |
+
+Playback start is unchanged after this (measured 5 s from cold), zero new errors.
+
+**Jellyfin → Kodi sync.** Installed **Kodi Sync Queue 7.0.0.0** on the server
+(`POST /Packages/Installed/Kodi%20Sync%20Queue?version=7.0.0.0`, then restart Jellyfin), which
+Jellyfin's docs recommend with library mode so Kodi gets library changes without waiting for a
+periodic re-sync. Check with `GET /Plugins` (`"status": "Active"`).
+
+**Kodi config backups (box side).** Daily systemd timer on the box:
+- script `/storage/.config/kodi-config-backup.sh`
+- units `/storage/.config/system.d/kodi-config-backup.{service,timer}` (`OnCalendar=daily`, `Persistent=true`)
+- output `/storage/backups/kodi/kodi-config-<YYYYmmdd-HHMM>.tar.gz`, last 7 kept
+- contains `userdata/` (settings, databases, `addon_data/`, keymaps) + `addons/`, excluding
+  `Thumbnails`, `Textures*`, `temp` and addon `resources`
+
+  Restore: extract into `/storage/.kodi/` with Kodi stopped.
+
+**PVR artwork.** `script.module.pvr.artwork` is installed and powers guide/OSD/NextUp art. Channel
+logos already come from Dispatcharr (`tvg-logo` → Kodi channel icons). Poster/fanart/metadata
+enrichment additionally needs a **TMDB API key** (and optionally fanart.tv) entered in the module's
+settings — not configured yet.
+
+
 
 The box can be tested without the TV:
 
