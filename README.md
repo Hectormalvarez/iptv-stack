@@ -46,6 +46,16 @@ Both containers have `/dev/dri` mounted. In Dispatcharr create a Stream Profile:
 
 In Jellyfin: Dashboard → Playback → Transcoding → enable VAAPI, device `/dev/dri/renderD128`.
 
+Notes (2026-09-21):
+
+- The agent must be told the provider's UA — Dispatcharr injects `{userAgent}` from the M3U account.
+- The container's ffmpeg lists `vaapi`/`qsv` and sees `/dev/dri/renderD128`.
+- A client-requested `output_profile` only takes effect when the channel is **not** already streaming on
+  another profile — Dispatcharr multiplexes extra clients onto the existing branch. Don't judge a
+  profile by requesting it for a channel that's already playing.
+- For the LAN Kodi box, **no transcoding is wanted**: the Latitude hardware-decodes H.264/HEVC itself,
+  so the default `-c copy` remux profile (id 1) is what's actually used.
+
 ## Channel cleanup (2026-09-21)
 
 14,936 → **3,590 visible channels, all with EPG**. Junk is *hidden* (`hidden_from_output=True`), never deleted — auto-sync keeps them updated and never re-creates them, and they can be un-hidden from the Channels page (filter "Hidden Only"). Hidden so far:
