@@ -94,6 +94,25 @@ Nightly Dispatcharr backups: `./dispatcharr/data/backups/` — copy these off-bo
 | `pvr.iptvsimple` | preinstalled | instance 1 → `http://usrv-01:9191/output/m3u?direct=true&output_profile=1` + `/output/epg`, refresh 51 min |
 | `skin.estuary.modv2` 21.4 | b-jesch GitHub (Omega branch) | needs script.skinshortcuts 2.0.3 + pvr.artwork + image.resource.select |
 | Wi-Fi power-save | off (runtime + systemd unit `wifi-powersave-off.service` in `/storage/.config/system.d/`) | fixes periodic drop-offs |
+| `pvr.iptvsimple` config | userdata | `catchupEnabled`, `allChannelsCatchupMode=4` (XC), `catchupDays=5`, `timeshiftEnabled=true` (HTTP) |
+| `guisettings.xml` tweaks | userdata | `pvrmanager.usebackendchannelnumbers=true`, `pvrplayback.confirmchannelswitch=false` (instant zap) |
+
+### Catchup & timeshift
+
+- **Catchup**: XC mode generates strong8k timeshift URLs from the guide — select any past program (≤5 days) in the guide and play it as if live. Works because stream URLs are direct XC (`cf.vovu.top/live/...ts`), not proxied.
+- **Timeshift**: `inputstream.ffmpegdirect` (preinstalled) buffers HTTP streams — pause/rewind live TV, seeking only back to when you started watching.
+- Edit these in `userdata/addon_data/pvr.iptvsimple/instance-settings-1.xml`, then `systemctl restart kodi`.
+
+### PVR behavior
+
+- Backend channel numbers (provider `tvg-chno`) are used — number entry on remote/Kore zaps directly.
+- Channel switch is instant (no confirm dialog).
+
+### Remaining customizations (not yet done)
+
+- Genre mapping file (`genres/genreTextMappings/genres.xml`) to clean up EPG categories + skin genre colors.
+- Custom channel groups file, per-channel `tvg-shift` for region-mismatched EPG, logo fallback for blank channels, parental PIN, favourites widget row in Mod V2, Kore PVR remote mode check.
+
 
 ### Known gotchas
 
