@@ -110,8 +110,10 @@ Nightly Dispatcharr backups: `./dispatcharr/data/backups/` — copy these off-bo
 
 ### Remaining customizations (not yet done)
 
-- Genre mapping file (`genres/genreTextMappings/genres.xml`) to clean up EPG categories + skin genre colors.
-- Custom channel groups file, per-channel `tvg-shift` for region-mismatched EPG, logo fallback for blank channels, parental PIN, favourites widget row in Mod V2, Kore PVR remote mode check.
+- Custom channel groups file, per-channel `tvg-shift` for region-mismatched EPG (only if observed), favourites widget row in Mod V2, Kore PVR remote mode check.
+- Parental PIN: N/A — no adult groups in the lineup.
+- Genre display: `useEpgGenreText=true` — guide shows provider EPG category text.
+- Channel logos: served by Dispatcharr (`/api/channels/logos/<id>/cache/`), verified HTTP 200.
 
 
 ### Known gotchas
