@@ -3,4 +3,4 @@ dispatcharr/
 jellyfin/
 recordings/
 .env
-.env.*
+.env.*watchstate/data/
