@@ -148,29 +148,42 @@ provider channels in other groups already use numbers 101–704.
 | `pvr.iptvsimple` config | userdata | `catchupEnabled=false`, `allChannelsCatchupMode=0`, `timeshiftEnabled=false` — deliberately off, see below. Backups: `/storage/backups/instance-settings-1.xml.pre-*` |
 | `guisettings.xml` tweaks | userdata | `pvrmanager.usebackendchannelnumbers=true`, `pvrplayback.confirmchannelswitch=false` (instant zap) |
 
-### Zapping on a single-connection subscription (fixed 2026-09-21)
+### Zapping / concurrent streams (root-caused and fixed 2026-09-21)
 
-The STRONG8K account allows **one** simultaneous provider connection, so a
-channel switch is a race: Kodi requests the new channel before releasing the old
-stream, so the upstream slot is still occupied and Dispatcharr answers
+Symptom: channel switches often failed or took ~40 s, with Dispatcharr logging
 `503 {"error": "All active M3U profiles have reached maximum connection limits"}`.
-Two fixes, both applied:
 
-1. **Raise Dispatcharr's retry budget** — `apps/proxy/live_proxy/views.py`
-   hardcodes `retry_timeout = 3` (with `retry_interval = 0.1`), which expired
-   ~55 ms before the old stream released. Run
-   `./scripts/patch-dispatcharr-zap-retry.sh` (idempotent; **re-run after every
-   Dispatcharr image update**) to raise it to 15 s.
-2. **Keep channels warm after the last client** — `proxy_settings` in
-   Dispatcharr's `CoreSettings`:
-   `channel_shutdown_delay: 0 → 3`, `channel_client_wait_period: 5 → 10`.
-   At 0 the channel is torn down the instant Kodi drops a connection, so Kodi's
-   retry hits `Channel ... unavailable. Teardown or pending shutdown` and gives
-   up; a few seconds keeps the buffer alive and the retry attaches instantly.
+Root cause: **the M3U account profile capped Dispatcharr at one upstream
+connection** (`M3UAccountProfile id=2 "STRONG8K Default".max_streams = 1`). A
+channel switch then races — Kodi requests the new channel while the old stream
+still holds the only slot — and Dispatcharr refuses until Kodi gives up and
+releases the old stream.
 
-Effect: switching takes a few seconds (black until the old slot releases) but
-succeeds instead of stopping playback. Raise `channel_shutdown_delay` for faster
-switch-back, at the cost of holding the single slot longer.
+The provider itself is **not** the constraint: raising the cap to 2 and pulling
+two different channels at the same time streamed both (`150000` bytes each,
+`Successfully obtained stream ... after 1 attempts`). So `max_streams` is now **2**:
+
+- Zaps get the stream on the first attempt (~8 s including Dispatcharr's ~5 s
+  buffer fill) instead of ~38 s of retry loops.
+- Kodi and Jellyfin can watch different channels at the same time.
+
+Supporting tuning in `CoreSettings` → `proxy_settings` (UI: System → proxy):
+
+| Setting | Was | Now | Why |
+|---|---|---|---|
+| `channel_shutdown_delay` | 0 | 3 | at 0 the channel is torn down the instant Kodi drops a connection, so a retry hits `Channel ... unavailable. Teardown or pending shutdown` and Kodi gives up |
+| `channel_client_wait_period` | 5 | 10 | keeps a ready channel alive while the client re-attaches |
+
+**Do not** raise `retry_timeout` in `apps/proxy/live_proxy/views.py` (upstream
+value: `3`, with `retry_interval = 0.1`). A longer budget was tested and made
+things *worse* (zaps went from ~10 s to ~38 s): Kodi blocks on Dispatcharr's HTTP
+response, so while Dispatcharr waits, Kodi never releases the old stream — the
+fast-fail path is what lets Kodi drop the old channel and retry cleanly.
+
+Caveat: the subscription is advertised as a single connection. Two concurrent
+streams work in practice, but if the provider tightens enforcement, set
+`max_streams` back to 1 (Channels → M3U account → profile) and expect slower
+switching; a 2-connection plan would remove the trade-off entirely.
 
 ### Stream path: always proxy through Dispatcharr (fixed 2026-09-21)
 
