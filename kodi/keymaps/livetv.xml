@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Kodi keymap for the IPTV box. Deploy to: /storage/.kodi/userdata/keymaps/livetv.xml
+  Kodi reads keymaps at startup (and live for most contexts).
+
+  Why this exists: this subscription has NO catchup/archive and timeshift is disabled
+  (see README), so Kodi's default left/right actions in live TV - StepBack/StepForward -
+  do nothing useful. They are repurposed for channel zapping, like a set-top box.
+
+  Everything else is left at Kodi's stock behaviour, which is already sensible:
+    up/down      OSD channel list          (default)
+    return/enter OSD                       (default)
+    g            channel guide             (default, repeated here for clarity)
+    c            channel list OSD          (default, repeated here for clarity)
+    pageup/down  channel up/down           (default)
+    0-9          channel number entry      (default; direct numbering is enabled via
+                                            pvrmanager.usebackendchannelnumbers + the
+                                            numbers assigned in Dispatcharr)
+
+  When the FLIRC receiver arrives it presents as a keyboard, so these bindings apply to
+  the physical remote too - no extra work needed beyond FLIRC's own button mapping.
+-->
+<keymap>
+  <FullscreenLiveTV>
+    <keyboard>
+      <left>ChannelDown</left>
+      <right>ChannelUp</right>
+      <g>ActivateWindow(PVRChannelGuide)</g>
+      <c>ActivateWindow(PVROSDChannels)</c>
+    </keyboard>
+  </FullscreenLiveTV>
+</keymap>

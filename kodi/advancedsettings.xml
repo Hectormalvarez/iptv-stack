@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Kodi advanced settings for the IPTV box (LibreELEC 12.2.1 / Kodi 21 Omega).
+  Deploy to: /storage/.kodi/userdata/advancedsettings.xml   (Kodi reads it only at startup)
+
+  Every tag below was verified to exist in this build:
+      strings /usr/lib/kodi/kodi.bin | grep -xiE '<tag>'
+
+  Tags that are commonly recommended for IPTV but DO NOT exist in Kodi 21
+  (removed in the videoplayer merge) - do not add them, they are silently ignored:
+      minvideocachelevel, minaudiocachelevel, readbufferfactor, maxchunksize,
+      readbuffer, buffermode, memorysize, readfactor
+  The cache is tuned through guisettings instead:
+      filecache.buffermode=2 (buffer HTTP), filecache.memorysize=64, filecache.readfactor=0 (adaptive)
+-->
+<advancedsettings version="1.0">
+
+  <!-- Normal logging. Set to 1 temporarily when debugging (produces a large log). -->
+  <loglevel>0</loglevel>
+
+  <!--
+    Stream robustness for the Dispatcharr proxy. IPTV upstreams stall briefly now and
+    then; Kodi's defaults are tuned for local servers, so give them room.
+      curlclienttimeout  default 10s -> 15s
+      curllowspeedtime   default 20s -> 15s (abort a stalled stream sooner, let the
+                                         proxy fail over instead of hanging)
+      curlretries        default 2   -> 3
+  -->
+  <network>
+    <curlclienttimeout>15</curlclienttimeout>
+    <curllowspeedtime>15</curllowspeedtime>
+    <curlretries>3</curlretries>
+  </network>
+
+  <!-- Keys sent by the FLIRC receiver arrive as keyboard input; this lets the
+       multimedia keys (play/pause/stop/next) control Kodi. -->
+  <enablemultimediakeys>true</enablemultimediakeys>
+
+  <!-- Delay between repeated remote presses (ms). Kodi's default is 500; leave it
+       here explicitly so the FLIRC keymap work has a documented starting point. -->
+  <remotedelay>500</remotedelay>
+
+</advancedsettings>

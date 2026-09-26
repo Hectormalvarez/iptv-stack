@@ -606,13 +606,117 @@ file on exit.
 
 - Backend channel numbers (provider `tvg-chno`) are used — number entry on remote/Kore zaps directly.
 - Channel switch is instant (no confirm dialog).
+- Channel-number entry timeout is **3000 ms** (`pvrplayback.channelentrytimeout`) so multi-digit numbers
+  like `101` can be typed without zapping on the first digit (Kodi default 0 = wait for an explicit OK).
+- "Play next programme" is left **on** (`pvrplayback.autoplaynextprogramme = true`).
+- Screensaver dim delay raised 3 → **15 min** (`screensaver.time`).
+
+### Display and playback tuning (2026-09-26)
+
+The client was rendering its GUI at **3840x2160 @ 30 Hz**. The TV's EDID marks 4K30 as *preferred* and
+Kodi took it, which is why the whole UI felt sluggish and why 60 Hz content could not be shown natively.
+The TV does offer 4K60 (and 1080p60/50/24, 720p60/50) — the kernel mode list proves it, so no cable or
+TV-side change was needed.
+
+**Finding the right `videoscreen.resolution` value.** Kodi's Display setting exposes only *one*
+representative mode per resolution, so the number you need is not obvious. The values are a stable index
+into the DRM mode list, offset from the first (preferred) mode:
+
+    value = 17 + (index in `modetest -c` output)
+
+Verified against all nine options Kodi offered — every one matched:
+
+| Kodi value | `modetest` # | Mode |
+|---|---|---|
+| 17 | #0 | 3840x2160 @ 30 (preferred — what it was stuck on) |
+| 21 | #4 | 4096x2160 @ 30 |
+| **26** | **#9** | **3840x2160 @ 60** ← now in use |
+| 36 | #19 | 1920x1080 @ 30 |
+| 41 | #24 | 1280x720 @ 60 |
+| 55 | #38 | 720x400 @ 70 |
+
+So: `modetest -c`, pick the mode you want, set `17 + index`. Values below 17 are ignored and Kodi
+silently falls back (a `value=7` experiment reverted to 17 on the next start).
+
+Applied:
+
+| Setting | Value | Why |
+|---|---|---|
+| `videoscreen.resolution` | **26** (3840x2160 @ 60) | 60 Hz UI; was stuck at 30 Hz |
+| `videoplayer.adjustrefreshrate` | **2** (On start/stop) | correct cadence per channel: 59.94 US, 50/25 EU, 24 film |
+| `videoscreen.whitelist` | 17 modes (4K/1080p/720p @ 24–60) | limits which modes switching may use |
+| `videoscreen.whitelistdoublerefreshrate` | true | 25→50 and 30→60 instead of judder |
+| `videoscreen.whitelistpulldown` | true | 24p handling when no 24 Hz mode is available |
+| `videoscreen.delayrefreshchange` | 2 (0.2 s) | brief settle before switching, less black flash |
+| `videoscreen.blankdisplays` | false | don't blank outputs during a mode change |
+
+Verified after the change: `GUI format 3840x2160, Display 3840x2160 @ 60.000000 Hz`, 0 errors, no new
+segfaults, and a channel still plays (`Player.Open` → *Live: College Football* on KXAN).
+
+**Trade-off:** with switching *On start/stop*, zapping between channels of different frame rates (a
+59.94 Hz US channel → a 50 Hz European one in the Mexico/Sports groups) causes a short HDMI resync/black
+flash. If that becomes annoying, set `videoplayer.adjustrefreshrate` to `3` (On start) or `0` (Off),
+accepting judder on non-matching content.
+
+### `advancedsettings.xml` (deployed from `kodi/advancedsettings.xml`)
+
+Tags commonly recommended for IPTV tuning — `minvideocachelevel`, `minaudiocachelevel`,
+`readbufferfactor`, `maxchunksize`, `buffermode`, `memorysize`, `readfactor` — were **removed in the
+videoplayer merge and do not exist in Kodi 21**; they are silently ignored. Verify a tag exists in this
+build before using it:
+
+    ssh root@192.168.1.181 "strings /usr/lib/kodi/kodi.bin | grep -xiE 'minvideocachelevel'"
+
+The deployed file uses only tags confirmed present: `<loglevel>`, `<network>` (`curlclienttimeout` 15,
+`curllowspeedtime` 15, `curlretries` 3) to ride out brief IPTV upstream stalls, plus
+`<enablemultimediakeys>` and `<remotedelay>` for the future FLIRC remote. Cache tuning stays in
+guisettings (mode 2 / 64 MB / adaptive — see *Startup, buffering, sync and backups*). Kodi only reads
+this file at startup and logs both files it loaded:
+
+    grep "Loaded settings file" /storage/.kodi/temp/kodi.log
+
+### `keymaps/livetv.xml` (deployed from `kodi/keymaps/livetv.xml`)
+
+With no catchup and timeshift disabled, Kodi's default left/right in fullscreen live TV
+(StepBack/StepForward) do nothing useful, so they are remapped to **channel down/up**, set-top-box style.
+Everything else stays at Kodi's defaults (`g` guide, `c` channel list OSD, page-up/down zapping, digit
+entry). The FLIRC receiver presents as a keyboard, so these bindings will apply to a physical remote too.
+
+### Jellyfin addon: live library updates
+
+`plugin.video.jellyfin` had `kodiCompanion = false`, so the **Kodi Sync Queue** plugin installed on the
+server was never being used and `LastIncrementalSync` was days stale. Now `true` in
+`userdata/addon_data/plugin.video.jellyfin/settings.xml` — libraries update without a manual sync. Edit
+that file only with Kodi **stopped**, otherwise Kodi rewrites it on exit.
+
+### Favourites are deliberately not pre-seeded
+
+Seeding favourite channels by hand would be nice, but `pvr://` paths are unsafe to hardcode here. Kodi's
+own logged path is volatile (`.../All%20channels@-1/1@pvr.iptvsimple_<random>.pvr`), and the stable-looking
+form `pvr://channels/tv/All channels/101.pvr` **resolved to the wrong channel** — it played
+*US: MOTORTREND HD* instead of KXAN. A favourite that tunes the wrong channel is worse than no favourite,
+so favouriting stays manual (Kore: context menu → *Add to favourites*); channel numbers and the
+`Austin Local` group already cover fast access.
+
+### LibreELEC system settings: not set headlessly
+
+`service.libreelec.settings` keeps almost nothing in its own XML — `oe_settings.xml` holds only
+`wizard_completed` flags; the real settings (update channel, idle shutdown, …) are written by its GUI
+against system files. Not worth the risk of hand-editing, so set them at the TV (Settings → LibreELEC at
+Advanced level): pick the update channel and turn off idle shutdown for a box that should act like a TV.
+Wake-on-LAN is moot until the box is on Ethernet — WoL over Wi-Fi is unreliable.
 
 ### Remaining customizations (not yet done)
 
-- Custom channel groups file, per-channel `tvg-shift` for region-mismatched EPG (only if observed), favourites widget row in Mod V2, Kore PVR remote mode check.
+- Favourites widget row in Mod V2, home-screen curation, Kore PVR remote-mode check (all GUI work).
+- LibreELEC update-channel + idle-shutdown toggles (GUI, see above).
+- Custom channel groups file / per-channel `tvg-shift` — only if time offsets are actually observed.
 - Parental PIN: N/A — no adult groups in the lineup.
 - Genre display: `useEpgGenreText=true` — guide shows provider EPG category text.
 - Channel logos: served by Dispatcharr (`/api/channels/logos/<id>/cache/`), verified HTTP 200.
+- Audio: passthrough left **off** on purpose. The HDMI sink registers as `AE_DEVTYPE_PCM` and the TV's
+  speakers are stereo, so bitstreaming buys nothing while it *would* bypass Kodi's volume control (Kore
+  volume buttons would stop working on AC3 streams). Revisit if a soundbar/AVR is added.
 
 ## Automation & sync (phase 2 proposal)
 
