@@ -16,15 +16,55 @@ Xtream Codes portal: `http://cf.vovu.top` — credentials live in Dispatcharr's 
 - The `get.php` M3U endpoint returns empty for plain curl; Dispatcharr imports via the XC API (`type=XC`), which works fine.
 - The XMLTV EPG (`/xmltv.php`) contains 4,423 channels with IDs like `SkySportsNews.uk` — country-suffixed, and mostly **not** matching the XC stream `tvg-id`s. Bulk name matching is required (below).
 
-## EPG setup (already done, documented for reference)
+## EPG pipeline (reworked 2026-09-26)
 
-The provider's EPG channel IDs don't match the M3U `tvg-id`s, so the guide shows placeholders until you bulk-match:
+Three EPG sources feed Dispatcharr:
 
-1. **Channels page → toolbar menu (⋮) → Auto-Match EPG** → default settings → Start.
-   Matches all channels without EPG by name. ~14k channels takes ~45 min (background celery task).
-2. Fix leftovers manually: channel row EPG dropdown, or select rows → bulk EPG assign.
-3. EPG source refreshes every 24h (M3U & EPG Manager → EPG row → edit).
-4. If programs are shifted by hours, adjust the EPG timezone offset in the EPG source settings.
+| Source | URL | Cadence | Purpose |
+|---|---|---|---|
+| `STRONG8K` | provider `/xmltv.php` | **6 h** | Mexico + international + the little US data it really carries |
+| `EPGSHARE-US-LOCALS` | `https://epgshare01.online/epgshare01/epg_ripper_US_LOCALS1.xml.gz` | 12 h | **US local stations**, call-sign IDs (`KXAN-DT.us_locals1`) |
+| `EPGSHARE-US2` | `https://epgshare01.online/epgshare01/epg_ripper_US2.xml.gz` | 12 h | US national cable (`CNN.HD.us2`, `NFL.Network.HD.us2`) |
+
+**Why the two extra sources:** the provider's XMLTV carries only **~379 US channel IDs out of 4,423** (the rest
+are India/France/Spain/UK/Poland/Mexico…). The bulk fuzzy auto-match below therefore bound US channels to
+whatever looked closest — `US: NBC 36 (KXAN) AUSTIN` → `KTRK.us` (ABC Houston), `CBS 42 (KEYE)` → `KPIX.us`
+(CBS San Francisco), `VIP: NFL NETWORK` → `infosportplus.fr`, `MX: NICK JR` → `NickJr.hu`. **673 of 865
+call-sign channels were mis-bound**, which is what made the guide look "wrong" even after the clock was fixed.
+
+**Matching rules** — `scripts/remap-epg.py` (dry-run by default; pipe a copy with `APPLY = True` to write):
+
+```bash
+docker exec -i dispatcharr python manage.py shell < scripts/remap-epg.py
+```
+
+1. Call-sign in the channel name (`(KXAN)`) → `KXAN-DT.us_locals1` — exact match only.
+2. Otherwise normalise the name and prefer the channel's own country (derived from its provider group or name
+   prefix: `MX| …` → `.mx`, `US| …` → `.us`), then the US feeds for US-style content.
+3. **Never** fall back to a third country — wrong data is worse than no data.
+
+Applied 2026-09-26: **104 channels remapped** (5 call-sign locals, 8 region fixes, 91 US-network fallbacks),
+replacing French/Portuguese/Hungarian/Albanian/Romanian guides. Before/after, same measurement method:
+
+| Metric | Before | After |
+|---|---|---|
+| Channels with programmes (curated profile) | 1,392 / 1,668 | **1,401 / 1,668** |
+| Austin Local with guide | 6/6 but *wrong stations* | **6/6 correct** (`KXAN-DT`, `KEYE-DT`, `KTRK-DT`) |
+| Median guide depth | 3.8 h | **14.4 h** (90th 25.3 h) |
+| Broadcasts per channel (median) | 7 | **21** |
+
+Gotchas worth knowing:
+
+- Dispatcharr only parses programmes for EPG entries that are **already mapped** — add the source, map the
+  channels, then refresh the source again, or those channels stay blank.
+- Refresh interval per source: M3U & EPG Manager → EPG row → edit, or set `EPGSource.refresh_interval`
+  (hours) via `manage.py shell` and `save()` (saving is what reschedules the celery-beat task).
+- `pvr.iptvsimple` reads the guide at Kodi start. To force a full rebuild after big EPG changes: stop Kodi,
+  delete `/storage/.kodi/userdata/Database/Epg16.db`, start Kodi.
+- Bulk matching still lives at **Channels → ⋮ → Auto-Match EPG**, but treat its output as a draft: verify
+  call-sign channels afterwards with `scripts/remap-epg.py`.
+- The provider stamps programmes with a `+0200` offset; Dispatcharr converts correctly (verified against
+  CNN's real schedule) — do not add a timezone workaround.
 
 ## Jellyfin Live TV hookup
 
