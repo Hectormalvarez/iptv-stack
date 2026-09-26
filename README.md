@@ -92,6 +92,33 @@ docker compose logs -f dispatcharr
 Dispatcharr admin account: `hadev` (password reset via `manage.py set_password` if lost).
 Nightly Dispatcharr backups: `./dispatcharr/data/backups/` — copy these off-box.
 
+### Timezones (fixed 2026-09-26)
+
+Everything used to be UTC, which made the Kodi guide display every programme **5 hours late** in
+Austin (CDT = UTC−5). Three layers, three fixes:
+
+| Layer | Setting | Value |
+|---|---|---|
+| Kodi box (LibreELEC) | `/storage/.cache/timezone` → read by `tz-data.service` (`EnvironmentFile=-/storage/.cache/timezone`, default `TIMEZONE=UTC`, symlinks `/var/run/localtime`) | `TIMEZONE=America/Chicago` |
+| `dispatcharr`, `jellyfin`, `watchstate` | `TZ` env in `docker-compose.yml` | `America/Chicago` |
+| host `usrv-01` | left on **UTC** deliberately — it also runs other production stacks | `Etc/UTC` |
+
+Details that matter:
+
+- LibreELEC has no `timedatectl`; the file above **is** the supported mechanism (it is what the
+  LibreELEC settings addon writes). After editing: `systemctl restart tz-data.service` **and** restart
+  Kodi — Kodi caches the timezone at startup.
+- The RTC stays UTC (correct); `America/Chicago` handles DST automatically.
+- Clock sync comes from ConnMan (`connmanctl clock` → `TimeUpdates = auto`), not
+  `systemd-timesyncd` (which is disabled) or chrony. The `ntpd` binary exists but no daemon runs.
+- The provider's XMLTV stamps programmes with a **`+0200`** offset. That is valid XMLTV and Dispatcharr
+  converts it correctly — verified against CNN's real schedule (The Lead 20:00 UTC, Erin Burnett
+  23:00 UTC, AC360 00:00 UTC). Do **not** add any offset workaround for this.
+- Verify: `ssh root@192.168.1.181 date` should print CDT, and
+  `readlink -f /var/run/localtime` → `/usr/share/zoneinfo/America/Chicago`.
+- Host cron still runs backups at **04:15 UTC = 23:15 CDT**. To move them to local time, add
+  `CRON_TZ=America/Chicago` at the top of the crontab rather than changing the host timezone.
+
 ## Kodi client (LibreELEC on Dell Latitude 5320)
 
 **Architecture:** Jellyfin-first for VOD (`jellyfin-kodi` addon syncs Movies/TV/Recordings/watch-state), `pvr.iptvsimple` for Live TV pointed at a **curated Dispatcharr channel profile**. Kodi 21 Omega / LibreELEC 12.2.1.

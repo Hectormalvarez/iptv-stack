@@ -13,6 +13,9 @@ services:
     devices:
       - /dev/dri:/dev/dri
     environment:
+      # Local time matters here: DVR schedules and the UI clock follow container TZ.
+      # The host stays on UTC (it runs other production stacks).
+      - TZ=America/Chicago
       - DISPATCHARR_ENV=aio
       - REDIS_HOST=localhost
       - CELERY_BROKER_URL=redis://localhost:6379/0
@@ -43,6 +46,9 @@ services:
     # Intel Iris Xe (TigerLake) — enables VAAPI hardware transcoding
     devices:
       - /dev/dri:/dev/dri
+    environment:
+      # Guide/recording timers and logs read local time
+      - TZ=America/Chicago
     networks:
       - media-net
     stop_grace_period: 30s
@@ -65,6 +71,8 @@ services:
       - "8081:8080"
     volumes:
       - ./watchstate/data:/config
+    environment:
+      - TZ=America/Chicago
     networks:
       - media-net
 
