@@ -661,19 +661,36 @@ Applied:
 |---|---|---|
 | `videoscreen.resolution` | **26** (3840x2160 @ 60) | 60 Hz UI; was stuck at 30 Hz |
 | `videoplayer.adjustrefreshrate` | **2** (On start/stop) | correct cadence per channel: 59.94 US, 50/25 EU, 24 film |
-| `videoscreen.whitelist` | 17 modes (4K/1080p/720p @ 24–60) | limits which modes switching may use |
-| `videoscreen.whitelistdoublerefreshrate` | true | 25→50 and 30→60 instead of judder |
-| `videoscreen.whitelistpulldown` | true | 24p handling when no 24 Hz mode is available |
+| `videoscreen.whitelist` | **empty** (Kodi default) | see *why the whitelist is empty* below |
+| `videoscreen.whitelistdoublerefreshrate` | true | 25→50 / 30→60 during whitelist search (inert while the whitelist is empty) |
+| `videoscreen.whitelistpulldown` | true | 24p handling (inert while the whitelist is empty) |
 | `videoscreen.delayrefreshchange` | 2 (0.2 s) | brief settle before switching, less black flash |
 | `videoscreen.blankdisplays` | false | don't blank outputs during a mode change |
 
 Verified after the change: `GUI format 3840x2160, Display 3840x2160 @ 60.000000 Hz`, 0 errors, no new
-segfaults, and a channel still plays (`Player.Open` → *Live: College Football* on KXAN).
+segfaults, and channels still play — `Player.Open` on 101 (KXAN → *Live: College Football*), 808
+(*How to Catch a Dirtbag*), 2701 (AF: CANAL+ SPORT → *Liga+*).
 
-**Trade-off:** with switching *On start/stop*, zapping between channels of different frame rates (a
-59.94 Hz US channel → a 50 Hz European one in the Mexico/Sports groups) causes a short HDMI resync/black
-flash. If that becomes annoying, set `videoplayer.adjustrefreshrate` to `3` (On start) or `0` (Off),
-accepting judder on non-matching content.
+**Why the whitelist is empty.** A whitelist was set twice and both attempts were silently mangled by this
+build, which is why it is back to Kodi's default (empty = all modes are candidates):
+
+- First attempt, entries formatted as the GUI writes them (`3840x2160 @ 60.00Hz`, 17 entries): Kodi logged
+  all **17 entries as the single mode `3840x2160 @ 30.000000 Hz`**, and every lookup answered
+  `[WHITELIST] No match` / `No resolution matched` — so switching did nothing at all.
+- Second attempt using the exact format Kodi itself prints (`3840x2160 @ 60.000000 Hz`, 24 entries):
+  **24 well-formed entries collapsed to 8 distinct modes**, and inconsistently — `1280x720 @ 59.940063`
+  was accepted but `1920x1080 @ 59.94` was not.
+
+With an empty whitelist the standard, well-tested path applies. Debug evidence that refresh switching is
+live and evaluating correctly (`advancedsettings.xml` `<loglevel>1</loglevel>`, then reverted):
+
+    [WHITELIST] Searching the whitelist for: width: 1920, height: 1080, fps: 29.970, 3D: false
+    CRenderManager::Configure - change configuration. 1920x1080. framerate: 29.97.
+
+**Trade-off:** with switching *On start/stop*, zapping between channels of clearly different frame rates can
+cause a short HDMI resync/black flash. Streams here report 29.97/25 fps, and 29.97 against a 60 Hz desktop
+is close enough that Kodi leaves the mode alone (no flash observed in testing). If resyncs do show up on
+European channels, set `videoplayer.adjustrefreshrate` to `3` (On start) or `0` (Off).
 
 ### `advancedsettings.xml` (deployed from `kodi/advancedsettings.xml`)
 
