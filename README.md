@@ -121,6 +121,30 @@ After cleanup: Jellyfin → Live TV → "Refresh Guide Data" (or Scheduled Tasks
 
 - Dispatcharr DVR output → `/data/recordings_host` → host `/mnt/storage/recordings` → Jellyfin sees it at `/recordings`.
 
+### Channels without a guide are swept to the end (2026-09-26)
+
+`scripts/build-kodi-profile.py` moves any curated channel with **no upcoming programme data** into a
+trailing group `No Guide` (numbers `9001+`), so every group above it in the guide is fully populated.
+The test is `ProgramData.objects.filter(end_time__gte=now)` — that matches what the client renders
+(stale backwards-looking programmes never appear).
+
+Result: 266 of the 1,668 channels moved out of `Mexico VIP` (83), `Sports: International` (77),
+`Sports: Networks` (75) and friends. The channels stay watchable at the end of the lineup; Jellyfin
+still sees the full playlist. A handful of channels whose last programme expires minutes later can
+land back in a normal group until the next run — re-run the script to tidy them.
+
+Two things to know before re-running the script:
+
+- **It is now idempotent**: provider-group matchers can only see the *original* provider groups, so on
+  a second run the script *adopts* channels already sitting in Kodi groups (keeping their group and
+  number). Without that, a re-run found only 207 channels and disabled 1,442 members — which actually
+  happened during this session and had to be repaired.
+- **Safety guard**: if the resolved set is less than 90% of the profile's current enabled members the
+  script aborts instead of writing (`FORCE = True` overrides).
+
+Repair recipe if the profile is ever gutted: re-enable membership for channels whose
+`channel_group.name` is one of the script's owned groups (see `KODI_GROUPS` in the script).
+
 ## Operations
 
 ```bash

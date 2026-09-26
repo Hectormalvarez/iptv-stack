@@ -14,9 +14,15 @@ path also disables membership for everything outside the curated set - that is
 what keeps the client playlist at 123 channels.
 """
 from apps.channels.models import Channel, ChannelGroup, ChannelProfile, ChannelProfileMembership
+from apps.epg.models import ProgramData
 
 DRY_RUN = True
+FORCE = False           # required to shrink the profile deliberately
 PROFILE_NAME = 'Kodi'
+# Channels with no guide data at all are moved to the end of the lineup so the
+# leading groups in the guide are fully populated (A3, 2026-09-26).
+NO_GUIDE_GROUP = 'No Guide'
+NO_GUIDE_BASE = 9001
 
 qs = Channel.objects.filter(hidden_from_output=False)
 BAD = ['ppv', '24/7', '24-7', 'test', 'adult', 'xxx', 'backup', 'dummy']
@@ -292,8 +298,28 @@ for ch in sorted(mx_prefixed, key=lambda c: (c.name or '').lower()):
 for matchers, kodi_group, base in MX_IMPORTS:
     import_group(matchers, kodi_group, base, vis_all)
 
+# Every group this script is allowed to own. Used both to adopt channels from a
+# previous run and to keep the sweep honest - do not add provider group names here.
+KODI_GROUPS = {
+    'Austin Local', 'Entertainment', 'Sports', 'Sports: NFL', 'Sports: NBA', 'Sports: MLB',
+    'Sports: NHL', 'Sports: College', 'Sports: Golf & Tennis', 'Sports: Soccer',
+    'Sports: Motorsport', 'Sports: Combat', 'Sports: Networks', 'Sports: International',
+    'Sports: Events', 'News', 'Kids', 'Movies', 'Spanish', 'Mexico', 'Mexico VIP',
+    'Mexico: VIX', NO_GUIDE_GROUP,
+}
+
 allrows = resolved + imported
 print(f'imported {len(imported)} extra channels; total {len(allrows)}\n')
+
+# --- Idempotency: a previous run already moved channels into the Kodi groups, so the
+# --- provider-group matchers above no longer see them. Adopt them back (keeping their
+# --- existing group/number) instead of dropping them from the profile.
+already = [ch.id for _, _, ch in allrows]
+adopted = []
+for ch in Channel.objects.filter(channel_group__name__in=KODI_GROUPS).exclude(id__in=already):
+    adopted.append((ch.channel_number or NO_GUIDE_BASE, ch.channel_group.name, ch))
+allrows = allrows + adopted
+print(f'adopted {len(adopted)} channels already in Kodi groups (idempotent re-run)\n')
 print('--- explicit picks (curated) ---')
 last_group = None
 for number, group, ch in resolved:
@@ -316,9 +342,48 @@ for group in sorted(by_group):
 for number, group, aliases in missing:
     print(f'  MISSING {number} {group} {aliases}')
 
+# --- A3: channels without any *upcoming* guide data are swept to a trailing group,
+# --- so every group above them in the guide is fully populated. Using end_time here
+# --- matches what the client actually renders (stale past programmes do not show).
+from django.utils import timezone as _tz
+epg_with_programs = set(
+    ProgramData.objects.filter(end_time__gte=_tz.now()).values_list('epg_id', flat=True).distinct())
+swept = []
+renumbered = []
+next_no_guide = NO_GUIDE_BASE
+for row in allrows:
+    number, group, ch = row
+    if getattr(ch, 'epg_data_id', None) not in epg_with_programs:
+        renumbered.append((next_no_guide, NO_GUIDE_GROUP, ch))
+        swept.append(ch)
+        next_no_guide += 1
+    else:
+        renumbered.append(row)
+allrows = renumbered
+if swept:
+    print(f'\nno-guide sweep: {len(swept)} channels -> "{NO_GUIDE_GROUP}" '
+          f'(numbers {NO_GUIDE_BASE}+)')
+    for ch in swept[:6]:
+        print(f'         e.g. {ch.name[:50]}')
+else:
+    print('\nno-guide sweep: nothing to move')
+
 if DRY_RUN:
     print('\nDRY RUN - nothing written')
 else:
+    # --- Safety guard: a bad resolve must never gut the live profile. ---
+    existing_profile = ChannelProfile.objects.filter(name=PROFILE_NAME).first()
+    current_enabled = 0
+    if existing_profile:
+        current_enabled = ChannelProfileMembership.objects.filter(
+            channel_profile=existing_profile, enabled=True).count()
+    print(f'\nresolved {len(allrows)} channels; profile currently has {current_enabled} enabled')
+    if current_enabled and len(allrows) < 0.9 * current_enabled and not FORCE:
+        print('ABORT: this would shrink the profile by more than 10%.')
+        print('  - the provider-group matchers only see the original group names; channels already')
+        print('    moved into Kodi groups are adopted above, so a short count means stale matchers')
+        print('  - set FORCE = True if the reduction is intentional')
+        raise SystemExit(1)
     profile, _ = ChannelProfile.objects.get_or_create(name=PROFILE_NAME)
     groups = {}
     for number, group, ch in allrows:
