@@ -156,6 +156,23 @@ docker compose logs -f dispatcharr
 Dispatcharr admin account: `hadev` (password reset via `manage.py set_password` if lost).
 Nightly Dispatcharr backups: `./dispatcharr/data/backups/` — copy these off-box.
 
+### Health check (`scripts/verify-stack.sh`)
+
+Read-only, never writes to Dispatcharr/Jellyfin/Kodi. Run it by hand, or read the daily log:
+
+```bash
+./scripts/verify-stack.sh                          # server checks
+KODI_HOST=root@192.168.1.181 ./scripts/verify-stack.sh   # + client checks (needs SSH keys)
+tail -40 /mnt/storage/backups/iptv-stack/verify.log      # cron output, 08:30 daily
+```
+
+It checks that all three containers are up, that the curated **Kodi profile still has ~1668 channels**
+(a provider re-sync that renumbers or drops channels is otherwise silent), **EPG coverage excluding the
+deliberately blank `No Guide` group** (must stay ≥95%), that all three EPG sources report `success`, that
+`/mnt/storage` has room, and that a backup landed in the last 2 days. Exit code is non-zero when
+something FAILs. The Kodi checks (display mode, log errors, segfault count) need key-based SSH; password
+auth is deliberately not baked into the script.
+
 ### Timezones (fixed 2026-09-26)
 
 Everything used to be UTC, which made the Kodi guide display every programme **5 hours late** in
