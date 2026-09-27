@@ -395,6 +395,53 @@ server-side, and serves the stream over the LAN. Verified: the box pulled
 `http://usrv-01:9191/proxy/ts/stream/<uuid>`, buffered (`buffer ready (86/4 chunks) -> active`),
 and played with no new `VideoPlayer` segfaults and zero log errors.
 
+### Channels with a single stream get a backup (fixed 2026-09-27)
+
+A channel with only one stream has **nothing to fail over to**, and this provider drops the connection
+roughly hourly. That is what "channel 219 won't play" turned out to be — not an EPG or client problem:
+
+```
+Stream ends prematurely at 1187824068 ... Error during demuxing: Input/output error
+Stream was stable for 2532.9 seconds                  <- played fine for 42 min
+Reconnecting in 0.25 seconds... (attempt 1/3)         -> Server returned 4XX Client Error
+Connection attempt 2/3 ...                            -> Server returned 4XX Client Error
+Maximum retry attempts (3) reached
+Trying to find alternative stream for channel ... current stream ID: 110
+Found 0 connect subscription(s) for event 'channel_error'   <- nothing to switch to, channel dies
+```
+
+The upstream itself was healthy the whole time (verified directly: HTTP 200, 18 MB, ~10 Mbps). The
+provider simply refuses the immediate reconnect while the old session is still closing, and with
+`MAX_RETRIES = 3` / `RETRY_WAIT_INTERVAL = 0.5` the proxy only retries for ~1.75 s before giving up.
+
+`scripts/add-backup-streams.py` attaches a second source (a `ChannelStream` with `order=1`) so the
+built-in `trying next stream` failover has somewhere to go. It is deliberately strict — two streams
+must normalise to the same core name, so a *different* network never gets attached:
+
+| Primary | Backup | Core |
+|---|---|---|
+| `US: HALLMARK HD` | `TV: HALLMARK CHANNEL` | `hallmark` |
+| `US: SHOWTIME HD` | `PRIME: SHOWTIME` | `showtime` |
+| `US: WWE HD` | `US: WWE NETWORK` | `wwe` |
+| `US: TENNIS HD` | `US: TENNIS CHANNEL` | `tennis` |
+
+…while near-misses are correctly rejected: `US: HALLMARK M & M HD` → `hallmarkmm`,
+`US: HALLMARK DRAMA HD` → `hallmarkdrama`, `AT&T: HALLMARK FAMILY` → `hallmarkfamily`.
+
+```bash
+docker exec -i dispatcharr python manage.py shell < scripts/add-backup-streams.py            # dry run
+docker exec -e BACKUP_APPLY=1 -i dispatcharr python manage.py shell < scripts/add-backup-streams.py
+```
+
+Applied 2026-09-27: **475 of the 1,668 profile channels gained a backup**; the other 1,193 are the only
+source the provider offers for that channel. Serving rate for #219 measured 1.06 MB/s (~8.5 Mbps)
+afterwards, appropriate for its 1080p60 H.264 feed.
+
+**Retry tuning was deliberately *not* applied.** `MAX_RETRIES` and `RETRY_WAIT_INTERVAL` are plain class
+attributes in `apps/proxy/config.py` — inside the container, so any edit is lost on the next image
+update or `--force-recreate`, and there is no env/DB override for them. A bind-mount would fight
+upstream changes. The backup-stream route is persistent and uses Dispatcharr's own failover instead.
+
 ### Why catchup and timeshift are OFF
 
 Both were enabled during setup and both are **crash sources here**:
