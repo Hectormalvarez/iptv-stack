@@ -739,7 +739,50 @@ file on exit.
 - "Play next programme" is left **on** (`pvrplayback.autoplaynextprogramme = true`).
 - Screensaver dim delay raised 3 → **15 min** (`screensaver.time`).
 
-### NFL RedZone and "won't stop playing on its own" (2026-09-27)
+### Event slots carry the provider's fixture in the *stream* name (2026-09-27)
+
+The 16 `NFL Live N` channels (and the NBA/MLB/NCAAF event slots) are the provider's PPV slot feeds. The
+curated lineup renames them to readable slot names because the raw channel names are cryptic
+(`NFL  | 02 -`, `NBA 06 :`) — but that **discarded the fixture the provider puts in the stream name**:
+
+```
+NFL  | 01 -                                <- empty slot
+NFL  | 02 - 1pm Chargers at Bills          <- the game
+NFL  | 15 - SNF 8:20pm Rams at Broncos
+NFL  | 16 - MNF 8:15pm Eagles at Bears
+```
+
+Result: 16 identical-looking channels with no way to tell which game was on which. `Channel.name` is the
+curated generic slot, but `Stream.name` still holds the provider's label — and Dispatcharr refreshes it as
+fixtures are assigned.
+
+`scripts/label-event-slots.py` reads the primary stream's name, extracts the fixture, and writes it to
+`ChannelOverride.name` (durable, and it leaves `Channel.name` as the generic slot so the channel stays
+identifiable for rebuilds):
+
+| Channel | Served name |
+|---|---|
+| #352 | `NFL: 1pm Chargers at Bills` |
+| #363 | `NFL: 4:25pm Ravens at Cowboys` |
+| #365 | `NFL: SNF 8:20pm Rams at Broncos` |
+| #366 | `NFL: MNF 8:15pm Eagles at Bears` |
+
+Empty slots have the override name **cleared**, so they fall back to the generic slot name — that way a slot
+labelled last week does not keep a stale fixture. Detection is driven by the *stream* name pattern
+(`LEAGUE nn -/:`), not the channel name, so it stays correct however the channel is renamed and never touches
+a non-slot channel.
+
+```bash
+docker exec -i dispatcharr python manage.py shell < scripts/label-event-slots.py              # dry run
+docker exec -e LABEL_APPLY=1 -i dispatcharr python manage.py shell < scripts/label-event-slots.py
+```
+
+Runs **daily at 09:00** via cron, since fixtures change every week (and the provider relabels the slots).
+Applied 2026-09-27: 13 NFL games labelled; NBA/MLB slots were empty (offseason).
+
+Note: `pvr.iptvsimple` reads the playlist at Kodi start, so renamed channels appear after the next Kodi
+restart — not immediately.
+
 
 **NFL RedZone** is the provider's `US: NFL REDZONE ᴴᴰ`, which lives in the `US| NFL PPV` group and ships
 **hidden**, so it never made it into the curated lineup. It is now #**325** in `Sports: NFL`, renamed to
