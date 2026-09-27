@@ -25,28 +25,43 @@ done
 echo "== dispatcharr: curated profile"
 stats=$(docker exec -i dispatcharr python manage.py shell 2>/dev/null <<'PY'
 from apps.channels.models import Channel, ChannelProfile, ChannelProfileMembership, ChannelGroup
-from apps.epg.models import EPGSource, ProgramData
+from apps.epg.models import EPGSource, EPGData, ProgramData
 from django.utils import timezone
+
+now = timezone.now()
+have = set(ProgramData.objects.filter(end_time__gte=now).values_list('epg_id', flat=True).distinct())
+# channels deliberately parked on the dummy source are "no guide by design", not gaps
+dummy_ids = set(EPGData.objects.filter(epg_source__source_type='dummy').values_list('id', flat=True))
+
 p = ChannelProfile.objects.filter(name='Kodi').first()
 if not p:
     print('PROFILE=missing')
 else:
     cids = list(ChannelProfileMembership.objects.filter(channel_profile=p, enabled=True)
                 .values_list('channel_id', flat=True))
-    have = set(ProgramData.objects.filter(end_time__gte=timezone.now())
-               .values_list('epg_id', flat=True).distinct())
     noguide = ChannelGroup.objects.filter(name='No Guide').first()
-    qs = Channel.objects.filter(id__in=cids)
-    blank_group = 0
-    if noguide:
-        blank_group = qs.filter(channel_group=noguide).count()
-        qs = qs.exclude(channel_group=noguide)
-    covered = sum(1 for c in qs if c.epg_data_id in have)
+    parked = 0
+    expect = 0
+    covered = 0
+    for c in (Channel.objects.filter(id__in=cids)
+              .select_related('epg_data', 'override__epg_data', 'channel_group')):
+        e = c.effective_epg_data_obj
+        eid = getattr(e, 'id', None)
+        if eid in dummy_ids:
+            parked += 1
+            continue
+        if noguide and c.channel_group_id == noguide.id:
+            parked += 1
+            continue
+        expect += 1
+        if eid in have:
+            covered += 1
     print('PROFILE=%d' % len(cids))
-    print('EXPECT=%d' % qs.count())
+    print('EXPECT=%d' % expect)
     print('COVERED=%d' % covered)
-    print('NOGUIDE=%d' % blank_group)
-for s in EPGSource.objects.all().order_by('id'):
+    print('NOGUIDE=%d' % parked)
+# dummy sources are intentionally idle - never report them as failed
+for s in EPGSource.objects.exclude(source_type='dummy').order_by('id'):
     print('SOURCE=%s:%s:%s' % (s.name, s.status, s.refresh_interval))
 PY
 )
