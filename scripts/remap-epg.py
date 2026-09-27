@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Remap curated Kodi-profile channels to better EPG sources.
+"""Remap channels to the correct EPG source (this is the "make the guide usable" fix).
 
 Run inside the Dispatcharr container (dry-run by default):
 
@@ -10,35 +10,86 @@ Add ``APPLY = True`` below (or pipe a modified copy) to actually write.
 Why this exists
 ---------------
 The provider's (STRONG8K) XMLTV only carries ~379 US channel ids out of ~4,423
-(the rest are India/France/Spain/UK/Poland/Mexico...). Dispatcharr's fuzzy
-matcher therefore bound US channels to whatever looked closest, e.g.
+(the rest are India/France/Spain/UK/Poland/Hungary...). Dispatcharr's fuzzy
+matcher therefore bound channels to whatever looked closest, e.g.
 
     US: NBC 36 (KXAN) AUSTIN   -> KTRK.us      (ABC Houston!)
     US: CBS 42 AUSTIN (KEYE)   -> KPIX.us      (CBS San Francisco!)
-    US: FOX 7 HD [AUSTIN]      -> WUTV.us      (FOX Buffalo!)
+    VIP: CANAL 13 (CAMPECHE)   -> canalplus.fr (Mexican channel, French guide!)
+    US: DISNEY CHANNEL WEST    -> DisneyChannel.hu (Hungarian guide!)
 
-Two epgshare01 feeds fix that:
-  * EPGSHARE-US-LOCALS  ids like ``KXAN-DT.us_locals1``  (call-sign based)
-  * EPGSHARE-US2        ids like ``CNN.HD.us2``          (national cable)
+Two epgshare01 feeds fix most of it:
+  * EPGSHARE-US-LOCALS  4,456 entries, call-sign ids (``KXAN-DT.us_locals1``)
+  * EPGSHARE-US2          769 entries, national cable (``CNN.HD.us2``)
 
-Matching is deliberately conservative: call-signs must match exactly, and
-network names must normalise to the same string. Anything ambiguous is left
-alone and reported.
+What this script does, per channel
+----------------------------------
+ 1. **call-sign match** - ``US: NBC 36 (KXAN) AUSTIN`` -> ``KXAN-DT.us_locals1``.
+    This binds each station to *its own* schedule rather than a sibling affiliate.
+ 2. **region-aware name match** - normalised name must land in the channel's own
+    region. A US channel will never be bound to a French entry.
+ 3. **unbind wrong-region bindings** - if a channel is bound to another country's
+    guide and nothing correct is available, the binding is cleared. A blank guide
+    is honest; a French schedule on a Mexican channel is not.
+ 4. Everything else is left untouched and reported.
+
+Only visible channels are touched (``hidden_from_output=False``) - that is exactly
+what Jellyfin imports and what the curated Kodi profile is drawn from.
 """
 
 import re
 from collections import Counter, defaultdict
 
-from apps.channels.models import Channel, ChannelProfile, ChannelProfileMembership
-from apps.epg.models import EPGData, EPGSource, ProgramData
+from apps.channels.models import Channel, ChannelOverride
+from apps.epg.models import EPGData, EPGSource
 
 APPLY = False
 LOCALS_SOURCE = 'EPGSHARE-US-LOCALS'
 NATIONAL_SOURCE = 'EPGSHARE-US2'
-PROFILE = 'Kodi'
+
+# Durable "no guide" target. Wrong-region bindings are pointed here instead of being
+# nulled, because the output resolves EPG as
+#     Coalesce(override__epg_data, channel.epg_data)
+# so an override of NULL falls straight back to the (wrong) provider binding. A dummy
+# EPG entry with no programmes makes Dispatcharr generate its own placeholder
+# programmes for the channel - honest, and it survives provider syncs.
+NOGUIDE_SOURCE = 'NO GUIDE'
+
+# Why writes go to ChannelOverride and not Channel
+# ------------------------------------------------
+# From the model docstring: "Sync writes only to Channel.* fields and never to this
+# table, so provider metadata keeps flowing while user customizations persist across
+# refreshes." Every M3U refresh re-resolves each channel's EPG (see
+# _resolve_epg_for_stream in m3u/tasks.py) and overwrites Channel.epg_data, which is
+# why the previous version of this script kept partially reverting. Overrides stick.
 
 CALLSIGN_RE = re.compile(r'\(([KW][A-Z]{2,4})\)')
 DROP_TOKENS = re.compile(r'\b(hd|fhd|uhd|4k|sd|hevc|raw|vip|backup|plus|h)\b', re.I)
+
+# Region of a channel is derived from its group name / name prefix, then mapped to
+# the country tag that its EPG entries carry.
+REGION_TAGS = {
+    'US': 'us', 'MX': 'mx', 'DE': 'de', 'UK': 'uk', 'CA': 'ca', 'FR': 'fr',
+    'ES': 'es', 'IN': 'in', 'PL': 'pl', 'NL': 'nl', 'PT': 'pt', 'BR': 'br',
+    'AR': 'ar', 'IT': 'it', 'HU': 'hu',
+}
+
+# Which EPG country tags are acceptable for a channel in a given region. Anything
+# outside this set counts as a wrong binding and is a candidate for unbinding.
+ACCEPT = {
+    'us': {'us', 'us2', 'us_locals1', 'espn', 'ca'},   # ca: CBC/CTV carried in US lists
+    'mx': {'mx', 'us2', 'es'},                          # no real MX feed exists
+    'ca': {'ca', 'us2'},
+    'uk': {'uk'},
+    'es': {'es'},
+    'fr': {'fr'},
+    'de': {'de'},
+    'it': {'it'},
+    'pt': {'pt'},
+    'pl': {'pl'},
+    'nl': {'nl'},
+    'in': {'in'},
+}
 
 
 def norm(text):
@@ -51,24 +102,30 @@ def norm(text):
     return re.sub(r'[^a-z0-9]', '', t)
 
 
-GROUP_REGION = {
-    'US': 'us', 'MX': 'mx', 'DE': 'de', 'UK': 'uk', 'CA': 'ca',
-    'FR': 'fr', 'ES': 'es', 'IN': 'in', 'PL': 'pl', 'NL': 'nl', 'PT': 'pt',
-}
+def region_of(ch):
+    """Best guess at which country's guide a channel should use.
 
-
-def region_hint(ch):
-    """Best guess at which country's guide a channel should use."""
+    Group names win over channel names because providers are inconsistent with the
+    name prefix (``US (ESPN+ 528) | ESPN+: Ottawa`` has no colon after ``US``).
+    """
     group = str(getattr(ch.channel_group, 'name', '') or '')
-    m = re.match(r'\s*([A-Za-z]{2,3})\s*\|', group)
-    if m and m.group(1).upper() in GROUP_REGION:
-        return GROUP_REGION[m.group(1).upper()]
-    m = re.match(r'\s*([A-Za-z]{2,3})\s*[:\-|]', ch.name)
-    if m and m.group(1).upper() in GROUP_REGION:
-        return GROUP_REGION[m.group(1).upper()]
-    if ch.name.upper().startswith('VIP:') or 'MEXICO' in group.upper():
+    name = ch.name or ''
+
+    for src in (group, name):
+        m = re.match(r'\s*([A-Za-z]{2,3})\s*[:|\-(\s]', src)
+        if m and m.group(1).upper() in REGION_TAGS:
+            return REGION_TAGS[m.group(1).upper()]
+
+    if name.upper().startswith('VIP:') or 'MEXICO' in group.upper():
         return 'mx'
     return None
+
+
+def accepts(region, country):
+    """Is ``country`` an acceptable guide for a channel in ``region``?"""
+    if region is None:
+        return True          # unknown region: never judge, never unbind
+    return country in ACCEPT.get(region, {region})
 
 
 def main():
@@ -105,74 +162,106 @@ def main():
 
     print('indexed keys: %d | call-sign entries: %d' % (len(index), len(call_index)))
 
-    prof = ChannelProfile.objects.get(name=PROFILE)
-    cids = ChannelProfileMembership.objects.filter(channel_profile=prof, enabled=True).values_list('channel_id', flat=True)
-    channels = Channel.objects.filter(id__in=list(cids)).select_related('epg_data', 'channel_group')
+    # --- channel scope: everything Jellyfin sees (visible), not just the Kodi profile ---
+    channels = (Channel.objects.filter(hidden_from_output=False)
+                .select_related('epg_data', 'channel_group', 'override__epg_data'))
+    print('scope: %d visible channels' % channels.count())
 
-    planned, stats, samples = [], Counter(), []
+    planned, stats, samples, unbinds = [], Counter(), [], []
     for ch in channels.iterator():
-        current = ch.epg_data
+        # effective value: an override wins over the provider-assigned binding
+        current = ch.effective_epg_data_obj
         cur_tvg = str(getattr(current, 'tvg_id', '') or '')
         cur_country = cur_tvg.rsplit('.', 1)[-1].lower() if cur_tvg else ''
+        region = region_of(ch)
 
-        hint = region_hint(ch)
-        target = None
-        method = None
+        target, method = None, None
 
-        m = CALLSIGN_RE.search(ch.name)
-        if m and m.group(1).lower() in call_index:
-            target, method = call_index[m.group(1).lower()], 'callsign'
-        else:
-            cands = index.get(norm(ch.name), {})
-            # Prefer the channel's own region; for US-style content allow the US feeds.
-            # Never fall back to an unrelated country's guide - wrong data is worse than none.
-            order = [hint] if hint else []
-            if hint in ('us', None):
+        # 1. call-sign match: each station gets its *own* schedule. Only attempted for
+        #    US-ish channels so a stray "(ABCD)" in a foreign name cannot misfire.
+        m = CALLSIGN_RE.search(ch.name or '')
+        if m and region in ('us', None):
+            cand = call_index.get(m.group(1).lower())
+            if cand:
+                target, method = cand, 'callsign'
+
+        # 2. region-aware name match
+        if target is None:
+            cands = index.get(norm(ch.name or ''), {})
+            order = [region] if region else []
+            if region in ('us', None):
                 order += ['us_locals1', 'us2', 'us']
+            elif region == 'mx':
+                order += ['mx', 'us2', 'es']
             else:
                 order += ['us2', 'us']
             for c in order:
-                if c and c in cands:
-                    target, method = cands[c], 'region' if c == hint else 'fallback'
+                if c and c in cands and accepts(region, c):
+                    target, method = cands[c], 'region' if c == region else 'fallback'
                     break
 
-        if target is None:
-            stats['no_exact_name_match'] += 1
-            continue
-        if cur_tvg.lower() == target.lower():
-            stats['already_correct'] += 1
+        if target is not None:
+            if cur_tvg.lower() == target.lower():
+                stats['already_correct'] += 1
+                continue
+            stats['planned_%s' % method] += 1
+            if cur_country:
+                stats['was_%s' % cur_country] += 1
+            planned.append((ch, target, method))
+            if len(samples) < 18:
+                samples.append((ch.name[:36], (cur_tvg or '-')[:24], target[:32], method))
             continue
 
-        stats['planned_%s' % method] += 1
-        if cur_country:
-            stats['was_%s' % cur_country] += 1
-        planned.append((ch, target, method))
-        if len(samples) < 16:
-            samples.append((ch.name[:34], (cur_tvg or '-')[:22], target[:30], method, str(getattr(ch.channel_group, 'name', ''))[:14]))
+        # 3. nothing correct available - is the existing binding from the wrong country?
+        if cur_tvg and not accepts(region, cur_country):
+            stats['unbind_%s_%s' % (region or '?', cur_country)] += 1
+            unbinds.append((ch, cur_tvg))
+            if len(samples) < 18 + 8:
+                samples.append((ch.name[:36], cur_tvg[:24], '(unbind)', 'wrong-region'))
+            continue
+
+        stats['left_alone'] += 1
 
     print('\n== plan ==')
-    for k, v in sorted(stats.items()):
-        print('   %-26s %d' % (k, v))
-    print('\n== samples (channel | current | proposed | method | group) ==')
+    for k, v in sorted(stats.items(), key=lambda x: (-x[1], x[0])):
+        print('   %-30s %d' % (k, v))
+    print('\n   REBIND total : %d' % len(planned))
+    print('   UNBIND total : %d' % len(unbinds))
+    print('\n== samples (channel | current | proposed | method) ==')
     for s in samples:
-        print('   %-34s %-22s %-30s %-8s %s' % s)
+        print('   %-36s %-24s %-32s %s' % s)
 
     if not APPLY:
         print('\nDRY RUN - nothing written. Set APPLY = True to apply.')
         return
 
-    cache, updated = {}, 0
+    # --- durable "no guide" target ---
+    noguide_src = EPGSource.objects.filter(name=NOGUIDE_SOURCE).first()
+    if noguide_src is None:
+        noguide_src = EPGSource.objects.create(
+            name=NOGUIDE_SOURCE, source_type='dummy', is_active=False)
+    noguide_epg = EPGData.objects.filter(epg_source=noguide_src).first()
+    if noguide_epg is None:
+        noguide_epg = EPGData.objects.create(
+            epg_source=noguide_src, tvg_id='no-guide', name='No guide data')
+    print('\nno-guide target: EPGData id=%s (source %r)' % (noguide_epg.id, NOGUIDE_SOURCE))
+
+    cache, updated, cleared = {}, 0, 0
     for ch, target, method in planned:
-        country = target.rsplit('.', 1)[-1].lower()
         if target not in cache:
             cache[target] = EPGData.objects.filter(tvg_id=target).first()
         epg = cache[target]
         if epg is None:
             continue
-        ch.epg_data = epg
-        ch.save(update_fields=['epg_data'])
+        ChannelOverride.objects.update_or_create(
+            channel=ch, defaults={'epg_data': epg})
         updated += 1
-    print('\nAPPLIED: %d channels remapped' % updated)
+    for ch, _tvg in unbinds:
+        ChannelOverride.objects.update_or_create(
+            channel=ch, defaults={'epg_data': noguide_epg})
+        cleared += 1
+    print('\nAPPLIED: %d channels remapped, %d wrong-region bindings blanked (via overrides)'
+          % (updated, cleared))
 
 
 main()
