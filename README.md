@@ -38,25 +38,77 @@ call-sign channels were mis-bound**, which is what made the guide look "wrong" e
 docker exec -i dispatcharr python manage.py shell < scripts/remap-epg.py
 ```
 
-1. Call-sign in the channel name (`(KXAN)`) → `KXAN-DT.us_locals1` — exact match only.
+1. Call-sign in the channel name (`(KXAN)`) → `KXAN-DT.us_locals1` — exact match only, and only for US-ish
+   channels so a stray `(ABCD)` in a foreign name cannot misfire.
 2. Otherwise normalise the name and prefer the channel's own country (derived from its provider group or name
-   prefix: `MX| …` → `.mx`, `US| …` → `.us`), then the US feeds for US-style content.
-3. **Never** fall back to a third country — wrong data is worse than no data.
+   prefix: `MX| …` → `.mx`, `US| …` → `.us`, `VIP:` / `MEXICO` → `.mx`), then the US feeds for US content.
+   `ACCEPT` encodes which country tags are legitimate per region.
+3. **Never** fall back to a third country. If nothing correct exists and the current binding is from the wrong
+   country, the binding is **blanked** — a French schedule on a Mexican channel is worse than no schedule.
+4. Channels with no region clue are never judged and never touched.
 
-Applied 2026-09-26: **104 channels remapped** (5 call-sign locals, 8 region fixes, 91 US-network fallbacks),
-replacing French/Portuguese/Hungarian/Albanian/Romanian guides. Before/after, same measurement method:
+Scope is **all visible channels** (`hidden_from_output=False` = 3,590), i.e. everything Jellyfin imports and
+the pool the Kodi profile is drawn from — not just the curated profile.
 
-| Metric | Before | After |
-|---|---|---|
-| Channels with programmes (curated profile) | 1,392 / 1,668 | **1,401 / 1,668** |
-| Austin Local with guide | 6/6 but *wrong stations* | **6/6 correct** (`KXAN-DT`, `KEYE-DT`, `KTRK-DT`) |
-| Median guide depth | 3.8 h | **14.4 h** (90th 25.3 h) |
-| Broadcasts per channel (median) | 7 | **21** |
+### Writes go to `ChannelOverride`, not `Channel` (this is what makes it stick)
+
+The first version wrote `channel.epg_data` and kept partially reverting. From the `ChannelOverride`
+model docstring:
+
+> *"Sync writes only to `Channel.*` fields and never to this table, so provider metadata keeps flowing
+> while user customizations persist across refreshes."*
+
+Every M3U refresh re-resolves each channel (see `_resolve_epg_for_stream` in `m3u/tasks.py`) and overwrites
+`Channel.epg_data`. The output path resolves EPG as:
+
+```python
+effective_epg_data = Coalesce(override__epg_data, epg_data)
+```
+
+So the script writes the override, which wins and survives syncs. **Blanking also needs the override** — an
+override of `NULL` would fall straight back to the wrong provider binding, so wrong-region channels are
+pointed at a dummy EPG entry (source `NO GUIDE`, `source_type='dummy'`, zero programmes). Dispatcharr then
+generates its own placeholder programmes for those channels, which is honest and durable.
+
+Applied 2026-09-26 (v2): **865 channels remapped, 981 wrong-region bindings blanked.**
+
+| Effective source (visible channels) | Channels |
+|---|---|
+| `STRONG8K` | 1,674 |
+| `NO GUIDE` (blanked) | 981 |
+| `EPGSHARE-US-LOCALS` | 821 |
+| `EPGSHARE-US2` | 114 |
+
+The blanked 981 are dominated by groups that are systematically wrong because no suitable feed exists:
+`Mexico VIP` (599 wrong of 650), `US\| PRIME` (73), `AR\| BOX OFFICE 4K` (67/67), `US\| ROKU` (45),
+`US\| TUBI` (7/7) — i.e. Mexican, Arabic and FAST-service channels that the fuzzy matcher had bound to
+French/Portuguese/Turkish/Hungarian guides.
+
+### The ordering trap: bind first, *then* refresh
+
+Dispatcharr deliberately only stores programmes for EPG entries **already mapped to a channel**
+(`parse_programs_for_source`: *"Skips programmes for unmapped channels entirely during parsing"*). The source
+log makes the scale of this obvious:
+
+```
+EPGSHARE-US-LOCALS: Parsed 553 programs for 5 channels
+                    (skipped 551,362 programs for 4451 unmapped channels)
+```
+
+So a fresh source with 4,456 entries can look almost empty until channels are mapped to it. **Bind, then
+refresh** — after the remap the refresh harvests those 551k programmes for the newly-mapped stations:
+
+```bash
+docker exec dispatcharr python manage.py shell -c "
+from apps.epg.tasks import refresh_epg_data
+refresh_epg_data.delay(3, force=True)"     # id 3 = EPGSHARE-US-LOCALS
+```
+
+Progress appears in `docker logs dispatcharr` as `Refreshing program data for tvg_id: KABC-DT.us_locals1`,
+one mapped entry at a time. Budget ~10–30 min for ~800 stations.
 
 Gotchas worth knowing:
 
-- Dispatcharr only parses programmes for EPG entries that are **already mapped** — add the source, map the
-  channels, then refresh the source again, or those channels stay blank.
 - Refresh interval per source: M3U & EPG Manager → EPG row → edit, or set `EPGSource.refresh_interval`
   (hours) via `manage.py shell` and `save()` (saving is what reschedules the celery-beat task).
 - `pvr.iptvsimple` reads the guide at Kodi start. To force a full rebuild after big EPG changes: stop Kodi,
