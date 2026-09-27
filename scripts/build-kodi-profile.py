@@ -23,6 +23,10 @@ PROFILE_NAME = 'Kodi'
 # leading groups in the guide are fully populated (A3, 2026-09-26).
 NO_GUIDE_GROUP = 'No Guide'
 NO_GUIDE_BASE = 9001
+# The sweep is ONE-WAY: once a channel is in 'No Guide' a later run will not move it
+# back, because the original group is not recorded anywhere. So run it when the guide
+# has settled, not while a big EPG refresh is still filling channels in.
+SWEEP_NO_GUIDE = True
 
 qs = Channel.objects.filter(hidden_from_output=False)
 BAD = ['ppv', '24/7', '24-7', 'test', 'adult', 'xxx', 'backup', 'dummy']
@@ -353,7 +357,11 @@ renumbered = []
 next_no_guide = NO_GUIDE_BASE
 for row in allrows:
     number, group, ch = row
-    if getattr(ch, 'epg_data_id', None) not in epg_with_programs:
+    # Judge by the EFFECTIVE epg (an override wins over the provider-assigned binding),
+    # otherwise the sweep reads a stale binding for every channel remap-epg.py fixed.
+    eff_epg = ch.effective_epg_data_obj
+    eff_id = getattr(eff_epg, 'id', None)
+    if SWEEP_NO_GUIDE and eff_id not in epg_with_programs:
         renumbered.append((next_no_guide, NO_GUIDE_GROUP, ch))
         swept.append(ch)
         next_no_guide += 1

@@ -194,6 +194,18 @@ Two things to know before re-running the script:
 - **Safety guard**: if the resolved set is less than 90% of the profile's current enabled members the
   script aborts instead of writing (`FORCE = True` overrides).
 
+Sweep timing matters (learned the hard way):
+
+- The sweep judges a channel by its **effective** EPG (`effective_epg_data_obj`), not `ch.epg_data_id`.
+  When `remap-epg.py` writes a `ChannelOverride`, the raw `ch.epg_data_id` still points at the *old*
+  wrong entry, so the original `epg_data_id` test read a stale binding for every remapped channel.
+- The sweep is **one-way**: a channel moved to `No Guide` is not moved back later, because its original
+  group is not recorded anywhere. So run it once the guide has settled — not while a large EPG harvest
+  is still filling channels in. `SWEEP_NO_GUIDE = False` skips the sweep entirely.
+- After the 2026-09-26 remap the sweep would have moved 910 channels, ~200 of which (the freshly
+  remapped US stations) were about to receive programme data from the `EPGSHARE-US-LOCALS` harvest.
+  Waiting for that harvest to drain first avoids stranding them.
+
 Repair recipe if the profile is ever gutted: re-enable membership for channels whose
 `channel_group.name` is one of the script's owned groups (see `KODI_GROUPS` in the script).
 
