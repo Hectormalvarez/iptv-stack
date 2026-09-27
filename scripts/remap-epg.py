@@ -37,13 +37,16 @@ Only visible channels are touched (``hidden_from_output=False``) - that is exact
 what Jellyfin imports and what the curated Kodi profile is drawn from.
 """
 
+import os
 import re
 from collections import Counter, defaultdict
 
 from apps.channels.models import Channel, ChannelOverride
 from apps.epg.models import EPGData, EPGSource
 
-APPLY = False
+# Dry run by default. To apply without editing the file (e.g. from cron):
+#   docker exec -e REMAP_APPLY=1 -i dispatcharr python manage.py shell < scripts/remap-epg.py
+APPLY = os.environ.get('REMAP_APPLY', '') == '1'
 LOCALS_SOURCE = 'EPGSHARE-US-LOCALS'
 NATIONAL_SOURCE = 'EPGSHARE-US2'
 
@@ -162,6 +165,13 @@ def main():
 
     print('indexed keys: %d | call-sign entries: %d' % (len(index), len(call_index)))
 
+    # Resolve the durable no-guide target up front so dry runs report already-blanked
+    # channels instead of re-proposing them every time.
+    noguid_src = EPGSource.objects.filter(name=NOGUIDE_SOURCE).first()
+    noguid_epg = (EPGData.objects.filter(epg_source=noguid_src).first()
+                  if noguid_src else None)
+    noguid_tvg = str(getattr(noguid_epg, 'tvg_id', '') or '')
+
     # --- channel scope: everything Jellyfin sees (visible), not just the Kodi profile ---
     channels = (Channel.objects.filter(hidden_from_output=False)
                 .select_related('epg_data', 'channel_group', 'override__epg_data'))
@@ -213,6 +223,9 @@ def main():
             continue
 
         # 3. nothing correct available - is the existing binding from the wrong country?
+        if cur_tvg and noguid_tvg and cur_tvg == noguid_tvg:
+            stats['already_blank'] += 1
+            continue
         if cur_tvg and not accepts(region, cur_country):
             stats['unbind_%s_%s' % (region or '?', cur_country)] += 1
             unbinds.append((ch, cur_tvg))
@@ -235,16 +248,15 @@ def main():
         print('\nDRY RUN - nothing written. Set APPLY = True to apply.')
         return
 
-    # --- durable "no guide" target ---
-    noguide_src = EPGSource.objects.filter(name=NOGUIDE_SOURCE).first()
-    if noguide_src is None:
-        noguide_src = EPGSource.objects.create(
+    # --- durable "no guide" target (created once, then reused) ---
+    if noguid_src is None:
+        noguid_src = EPGSource.objects.create(
             name=NOGUIDE_SOURCE, source_type='dummy', is_active=False)
-    noguide_epg = EPGData.objects.filter(epg_source=noguide_src).first()
-    if noguide_epg is None:
-        noguide_epg = EPGData.objects.create(
-            epg_source=noguide_src, tvg_id='no-guide', name='No guide data')
-    print('\nno-guide target: EPGData id=%s (source %r)' % (noguide_epg.id, NOGUIDE_SOURCE))
+        print('created EPG source %r' % NOGUIDE_SOURCE)
+    if noguid_epg is None:
+        noguid_epg = EPGData.objects.create(
+            epg_source=noguid_src, tvg_id='no-guide', name='No guide data')
+    print('no-guide target: EPGData id=%s tvg_id=%r' % (noguid_epg.id, noguid_epg.tvg_id))
 
     cache, updated, cleared = {}, 0, 0
     for ch, target, method in planned:
@@ -258,7 +270,7 @@ def main():
         updated += 1
     for ch, _tvg in unbinds:
         ChannelOverride.objects.update_or_create(
-            channel=ch, defaults={'epg_data': noguide_epg})
+            channel=ch, defaults={'epg_data': noguid_epg})
         cleared += 1
     print('\nAPPLIED: %d channels remapped, %d wrong-region bindings blanked (via overrides)'
           % (updated, cleared))
