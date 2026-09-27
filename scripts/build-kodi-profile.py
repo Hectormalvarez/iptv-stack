@@ -132,6 +132,7 @@ LINEUP = [
     (319, 'Sports', ['sky sports f1'], []),
     # --- Sports by league ---
     (321, 'Sports: NFL', ['nfl network'], ['us:']),
+    (325, 'Sports: NFL', ['nfl redzone'], ['us:']),
     (322, 'Sports: NBA', ['nba tv'], []),
     (323, 'Sports: MLB', ['mlb network'], ['us:']),
     (324, 'Sports: NHL', ['nhl network'], ['us:']),
@@ -352,6 +353,10 @@ for number, group, aliases in missing:
 from django.utils import timezone as _tz
 epg_with_programs = set(
     ProgramData.objects.filter(end_time__gte=_tz.now()).values_list('epg_id', flat=True).distinct())
+# Hand-curated picks (LINEUP + EVENTS) keep their group and number even when they have no
+# guide data - e.g. NFL RedZone carries no EPG, and sweeping it to 'No Guide' would move a
+# channel the user asked to sit in the NFL group. Only bulk imports get swept.
+curated_ids = {ch.id for _, _, ch in resolved}
 swept = []
 renumbered = []
 next_no_guide = NO_GUIDE_BASE
@@ -361,7 +366,7 @@ for row in allrows:
     # otherwise the sweep reads a stale binding for every channel remap-epg.py fixed.
     eff_epg = ch.effective_epg_data_obj
     eff_id = getattr(eff_epg, 'id', None)
-    if SWEEP_NO_GUIDE and eff_id not in epg_with_programs:
+    if SWEEP_NO_GUIDE and ch.id not in curated_ids and eff_id not in epg_with_programs:
         renumbered.append((next_no_guide, NO_GUIDE_GROUP, ch))
         swept.append(ch)
         next_no_guide += 1

@@ -739,7 +739,32 @@ file on exit.
 - "Play next programme" is left **on** (`pvrplayback.autoplaynextprogramme = true`).
 - Screensaver dim delay raised 3 → **15 min** (`screensaver.time`).
 
-### Display and playback tuning (2026-09-26)
+### NFL RedZone and "won't stop playing on its own" (2026-09-27)
+
+**NFL RedZone** is the provider's `US: NFL REDZONE ᴴᴰ`, which lives in the `US| NFL PPV` group and ships
+**hidden**, so it never made it into the curated lineup. It is now #**325** in `Sports: NFL`, renamed to
+`NFL RedZone` (via `ChannelOverride.name`, which — unlike a raw rename — survives provider sync), and added
+to `LINEUP` in `scripts/build-kodi-profile.py` so rebuilds keep it.
+
+It also has **three sources** (`US: NFL REDZONE ᴴᴰ`, `TV: NFL REDZONE ᴿᴬᵂ`, `AT&T: NFL REDZONE ᴿᴬᵂ`), which
+is the main thing that stops it dying when the provider drops the connection.
+
+Playback-continuity settings applied on the box:
+
+| Setting | Value | Why |
+|---|---|---|
+| `pvrplayback.autoplaynextprogramme` | **false** | at each programme boundary Kodi otherwise re-tunes; leaving it off keeps one continuous stream |
+| `powermanagement.shutdowntime` | 0 | no idle shutdown timer |
+| `powermanagement.displaysoff` | 0 | never blank the display |
+| `screensaver.time` | 15 (unchanged) | Kodi inhibits the screensaver during video playback, so it cannot interrupt TV |
+
+LibreELEC's `idle_timeout` turned out to be a **Bluetooth** setting (`oe.read_setting('bluetooth', …)`), not
+a shutdown timer, and no idle-shutdown service is active — so there was nothing to disable there.
+
+**Hand-curated picks are now exempt from the No-Guide sweep.** RedZone carries no EPG, so the sweep would
+have moved it to `No Guide` and renumbered it. The sweep now skips anything from `LINEUP`/`EVENTS`
+(`curated_ids`) and only re-homes bulk imports — which also protects the PPV event slots. Effect on the
+sweep: 910 → **874** channels.
 
 The client was rendering its GUI at **3840x2160 @ 30 Hz**. The TV's EDID marks 4K30 as *preferred* and
 Kodi took it, which is why the whole UI felt sluggish and why 60 Hz content could not be shown natively.
