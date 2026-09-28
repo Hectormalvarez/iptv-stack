@@ -1,0 +1,19 @@
+# Memory Bank
+
+Read these files at the start of any task in this repo, and update them at the end:
+
+- `memory-bank/projectbrief.md` — what the stack is, components, provider constraints
+- `memory-bank/techContext.md` — versions, hosts, repo layout, cron, access
+- `memory-bank/systemPatterns.md` — Dispatcharr internals and Kodi gotchas (the expensive lessons)
+- `memory-bank/activeContext.md` — current state and recent work
+- `memory-bank/progress.md` — done vs pending
+- `memory-bank/decisions.md` — decision log with rationale
+
+Rules:
+1. Never put credentials, tokens or passwords in the memory bank or any committed file.
+   Provider credentials live in the README's provider section only.
+2. `README.md` is the deep reference (root causes, exact commands, gotchas). The memory bank is
+   the index — point to README sections instead of duplicating them.
+3. When you fix something non-obvious, add it to `systemPatterns.md` and the decision log with
+   the reason, not just the change.
+4. Keep `progress.md`'s "Pending" list accurate — it is the next-session todo.
