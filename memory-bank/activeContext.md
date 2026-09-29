@@ -1,9 +1,22 @@
-# Active Context (2026-09-27)
+# Active Context (2026-09-29)
 
 ## Where things stand
 The stack works end to end and is being used. Kodi boots into the TV guide, zaps by channel
 number, plays NFL RedZone continuously with 3 failover sources, and every NFL game slot is
 labelled with its fixture.
+
+## 2026-09-29 provider outage (resolved)
+- MNF night: Kodi couldn't play the game. Root cause was a **provider-wide outage** — every
+  stream on `cf.vovu.top` returned Cloudflare `error code: 502` (origin down), including
+  web-root HTTPS. Nothing local was broken; `verify-stack.sh` stayed healthy throughout.
+- Diagnostic shortcut: before touching bindings/streams, curl 2+ unrelated channels' URLs.
+  502 on all = provider outage, just wait. Recovery signs: web root goes 502 → 401
+  "Restricted", stream URLs go 502 → 302 (redirect to data).
+- Once the origin returned, played the dedicated **4K MNF event slot (ch 7038,
+  `NFL | 4k - MNF 8:15pm Eagles at Bears`)** via JSON-RPC
+  `Player.Open {"item":{"channelid":5171}}`; confirmed `speed:1`, programme time advancing.
+  The 4K feed tested ~95 Mbps. Channel 2251 (NFL Network HD) carries the same 4K MNF stream
+  as its failover.
 
 ## Current lineup numbers
 | Range | Group |
