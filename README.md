@@ -129,6 +129,62 @@ The `xc-token` is the per-user XC API password in Dispatcharr (Users → user �
 
 Then Jellyfin → Dashboard → Live TV → "Refresh Guide Data" (the 84 MB XMLTV with ~14k channels takes a few minutes).
 
+## Provider VOD library → Jellyfin (2026-09-29)
+
+The STRONG8K subscription includes a VOD catalog exposed through the XC `player_api`
+(`get_vod_streams` = ~28.7k movies in 66 categories, `get_series` = ~8.6k series in 57
+categories, with TMDB poster URLs). It is **not** wired through Dispatcharr — Dispatcharr
+0.30 has a `vod` app for ingest, but no client-facing output, so the provider's XC API is
+consumed directly by a Jellyfin plugin instead.
+
+### Chosen setup: Jellyfin-Xtream-Library plugin (STRM-based)
+
+- **Plugin**: `Xtream Library` by firestaerter3, installed as
+  `Xtream Library_1.55.3.0/` (newest release that targets ABI 10.11; the v2.0.x series
+  targets Jellyfin 12 — check `targetAbi` before upgrading). Manifest:
+  <https://firestaerter3.github.io/jellyfin-plugin-repo/manifest.json>
+- **Why this and not Kevinjil's `Jellyfin.Xtream`**: that plugin exposes VOD/series as
+  Jellyfin *channels*, which jellyfin-kodi does not sync — Kodi would never see the
+  content. Xtream Library writes **`.strm` + `.nfo` files to disk**, which become ordinary
+  native Jellyfin libraries, so jellyfin-kodi picks them up like any other media.
+- **Layout on disk**: plugin writes to `/media/vod-strm/{movies,series}` in the container
+  = `/mnt/storage/vod-strm` on the host (bind mount added to `docker-compose.yml`).
+- **Jellyfin libraries** (created via API): `VOD Movies` (movies) → `/media/vod-strm/movies`,
+  `VOD Series` (tvshows) → `/media/vod-strm/series`.
+- **Plugin config**: `jellyfin/config/plugins/configurations/Jellyfin.Xtream.Library.xml`.
+  Credentials are pulled from Dispatcharr's M3U account by
+  `scripts/write-xtream-library-config.sh` (never printed/committed). Category selection is
+  applied through the plugin config API (`POST /Plugins/<guid>/Configuration`) because
+  hand-written `<Int32>` arrays in the XML did not deserialize — set
+  `Providers[0].SelectedVodCategoryIds` / `SelectedSeriesCategoryIds` via JSON instead.
+- **Live TV in the plugin is OFF** (`EnableLiveTv=false`) — live TV stays on the
+  Dispatcharr M3U tuner.
+- **Scheduled sync**: daily 04:30 (plugin task "Sync Xtream Library"), incremental with a
+  full re-sync weekly. Manual trigger: `POST /XtreamLibrary/Sync` (admin token),
+  status via `/XtreamLibrary/Progress`.
+
+### Gotchas learned while setting this up (2026-09-29)
+
+- Jellyfin 10.11 does **not** load flat DLLs dropped in `plugins/`; the plugin needs a
+  versioned subfolder `Xtream Library_<version>/` containing the DLL and a `meta.json`
+  (copy the shape of the Kodi Sync Queue folder). A wrong shared-library match shows as
+  "Failed to load assembly ... incompatible version ... Disabling plugin" — v2.0.9.0 hit
+  this even though its `build.yaml` claims 10.11; v1.55.3.0 loads clean.
+- **The provider rate-limits `player_api.php` aggressively.** The plugin's first sync with
+  "all categories" fires thousands of API calls and trips a Cloudflare 403 block on the
+  whole IP (live streams keep working; only the API is blocked, for ~15–45 min).
+  Start with a few categories selected (`SelectedVodCategoryIds`) and gentle settings
+  (`RequestDelayMs=250`, `SyncParallelism=3`, `MaxRetries=5`), verify, then widen.
+- Xtream credentials appear in plaintext inside every `.strm` file (XC protocol property).
+  `/mnt/storage/vod-strm` is on the private NAS disk, not exported anywhere; keep it that
+  way. Same caveat as the provider section above — treat the subscription as compromised
+  if that directory leaks.
+- Jellyfin admin auth: the `root` user had no stored credential (deliberately). Password
+  was reset via the local forgot-password flow (`POST /Users/ForgotPassword` → server
+  writes `passwordreset_<hash>.json` into `/config` → redeem with
+  `POST /Users/ForgotPassword/Pin`), then set to a generated value. Blank-password login
+  is refused by 10.11. Do not commit the password anywhere.
+
 ## Hardware transcoding (VAAPI, Intel Iris Xe)
 
 Both containers have `/dev/dri` mounted. In Dispatcharr create a Stream Profile:

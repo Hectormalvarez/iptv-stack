@@ -13,6 +13,16 @@
   then generates placeholder programmes named after the channel.
 - **A single stream per channel is fragile.** Providers reset streams ~hourly and refuse the
   immediate reconnect (4XX). Failover only works if a `ChannelStream(order=1)` exists.
+- **Provider-wide stream/API failures are usually the provider, not the stack.** Before
+  touching bindings, curl 2+ unrelated channels' URLs: 502-on-all = origin outage (wait);
+  403-on-player_api-only = rate limit from too many API calls (live streams keep working).
+  The Xtream Library plugin with "all categories" selected trips the 403 block — keep the
+  category selection tight and `RequestDelayMs` ≥ 250 until proven stable.
+- **Jellyfin 10.11 plugin loading**: flat DLLs in `plugins/` are ignored; plugins need a
+  `Name_version/` subfolder with the DLL + a `meta.json`. "Failed to load assembly ...
+  incompatible version" = shared-library mismatch; try the next-oldest release.
+- **jellyfin-kodi does not sync Jellyfin "channels"** — only native libraries. Any provider
+  content that must reach Kodi has to land in Movies/TVShows libraries (STRM files work).
 - **`max_streams` is Dispatcharr's own cap**, not the provider's. Was 1 (caused 503s on every
   zap), now 2.
 - **Retries are hardcoded in-container** (`apps/proxy/config.py`: `MAX_RETRIES=3`,

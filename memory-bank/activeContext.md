@@ -3,20 +3,33 @@
 ## Where things stand
 The stack works end to end and is being used. Kodi boots into the TV guide, zaps by channel
 number, plays NFL RedZone continuously with 3 failover sources, and every NFL game slot is
-labelled with its fixture.
+labelled with its fixture. The provider's VOD catalog is being wired into Jellyfin via the
+Xtream Library plugin (see README *Provider VOD library → Jellyfin*) — wiring complete,
+first smoke-test sync pending the provider lifting a temporary API rate-limit block.
 
-## 2026-09-29 provider outage (resolved)
+## Provider VOD wiring (2026-09-29, in progress)
+- Chose **Xtream Library** (firestaerter3, STRM-based) over Kevinjil's Jellyfin.Xtream:
+  channels-type content does NOT sync to Kodi via jellyfin-kodi; STRM files become native
+  libraries that do. v1.55.3.0 = newest ABI-10.11 build that loads (v2.0.9.0 fails even
+  though its build.yaml says 10.11).
+- Plugin config + category selection + the two Jellyfin libraries (`VOD Movies`,
+  `VOD Series`) are in place; Daily 04:30 sync scheduled.
+- Gotcha: the plugin's "all categories" first sync hammers `player_api` and trips a
+  Cloudflare 403 IP block (~15–45 min). Selection trimmed to 3 categories and settings
+  gentled (250 ms delay, parallelism 3) before retry. Details: README section.
+- Jellyfin `root` password was reset (user request; was never stored). New value given to
+  the user, MustUpdatePassword set — not stored in the repo.
+
+## 2026-09-29 provider outage (earlier, resolved)
 - MNF night: Kodi couldn't play the game. Root cause was a **provider-wide outage** — every
   stream on `cf.vovu.top` returned Cloudflare `error code: 502` (origin down), including
   web-root HTTPS. Nothing local was broken; `verify-stack.sh` stayed healthy throughout.
 - Diagnostic shortcut: before touching bindings/streams, curl 2+ unrelated channels' URLs.
   502 on all = provider outage, just wait. Recovery signs: web root goes 502 → 401
   "Restricted", stream URLs go 502 → 302 (redirect to data).
-- Once the origin returned, played the dedicated **4K MNF event slot (ch 7038,
-  `NFL | 4k - MNF 8:15pm Eagles at Bears`)** via JSON-RPC
-  `Player.Open {"item":{"channelid":5171}}`; confirmed `speed:1`, programme time advancing.
-  The 4K feed tested ~95 Mbps. Channel 2251 (NFL Network HD) carries the same 4K MNF stream
-  as its failover.
+- Once the origin returned, played the dedicated **4K MNF event slot (ch 7038)** via
+  JSON-RPC `Player.Open {"item":{"channelid":5171}}`; confirmed live playback. The 4K feed
+  tested ~95 Mbps. Channel 2251 (NFL Network HD) carries the same 4K MNF stream as failover.
 
 ## Current lineup numbers
 | Range | Group |
