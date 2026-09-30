@@ -309,9 +309,13 @@ KODI_GROUPS = {
     'Austin Local', 'Entertainment', 'Sports', 'Sports: NFL', 'Sports: NBA', 'Sports: MLB',
     'Sports: NHL', 'Sports: College', 'Sports: Golf & Tennis', 'Sports: Soccer',
     'Sports: Motorsport', 'Sports: Combat', 'Sports: Networks', 'Sports: International',
-    'Sports: Events', 'News', 'Kids', 'Movies', 'Spanish', 'Mexico', 'Mexico VIP',
-    'Mexico: VIX', NO_GUIDE_GROUP,
+    'Sports: Events', 'Sports: WNBA', 'News', 'Kids', 'Movies', 'Spanish', 'Mexico',
+    'Mexico VIP', 'Mexico: VIX', NO_GUIDE_GROUP,
 }
+
+# Groups whose members are curated by another script (scripts/add-wnba-events.py) but
+# carry no EPG: like the LINEUP/EVENTS picks they must not be swept to 'No Guide'.
+CURATED_GROUPS = {'Sports: WNBA'}
 
 allrows = resolved + imported
 print(f'imported {len(imported)} extra channels; total {len(allrows)}\n')
@@ -357,6 +361,8 @@ epg_with_programs = set(
 # guide data - e.g. NFL RedZone carries no EPG, and sweeping it to 'No Guide' would move a
 # channel the user asked to sit in the NFL group. Only bulk imports get swept.
 curated_ids = {ch.id for _, _, ch in resolved}
+curated_ids |= set(Channel.objects.filter(channel_group__name__in=CURATED_GROUPS)
+                   .values_list('id', flat=True))
 swept = []
 renumbered = []
 next_no_guide = NO_GUIDE_BASE
