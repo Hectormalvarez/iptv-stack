@@ -11,19 +11,42 @@
 - **Failover**: 475 channels have ≥2 sources
 - **Kodi client**: 4K60 GUI, refresh switching, boot-to-guide, 10-min playlist refresh,
   Live TV keymap, VAAPI, Kore remote, daily config backups to `/storage/backups/kodi`
-- **Jellyfin**: tuner + guide from Dispatcharr, VAAPI, Kodi Sync Queue active, root password reset
+- **Sports event slots**: NFL/NBA/MLB slots 341–367 + WNBA fixtures 368–375 (`Sports: WNBA`)
+  with durable fixture names, added to the guide on 2026-09-29
+- **Jellyfin**: tuner + guide from Dispatcharr, VAAPI, Kodi Sync Queue active, root password
+  reset (2026-09-29; new password held by the user, not in git)
+- **Provider VOD → Jellyfin**: Xtream Library plugin v1.55.3.0, `VOD Movies` + `VOD Series`
+  libraries over STRM files in `/mnt/storage/vod-strm`; category selection limited to the
+  English "best of" (46 movie + 26 series categories); daily 04:30 sync
 - **Ops**: `verify-stack.sh` healthy, 5 cron jobs, drift guards (idempotent + safety-abort scripts)
-- **Repo**: 41 conventional commits, clean tree, credentials kept out of git
+- **Repo**: 46 conventional commits, credentials kept out of git
 
 ## Pending — the one operational step left ⚠️
 - **Re-run the No-Guide sweep.** It was deferred while the EPG harvest drained (the harvest is
-  now finished). Dry run expects **874** channels → `No Guide`, with curated picks exempt.
+  now finished). Dry run expects **889** channels → `No Guide`, with curated picks exempt
+  (`Sports: WNBA` is now in `CURATED_GROUPS`, so the new event slots stay put).
   ```bash
   cd /home/hadev/Projects/Lab/iptv-stack && sed 's/^DRY_RUN = True$/DRY_RUN = False/' \
     scripts/build-kodi-profile.py | docker exec -i dispatcharr python manage.py shell
   ```
   Then refresh Jellyfin's guide. Until this runs, blank channels still sit inside
   `Mexico VIP` / `Sports: …` groups.
+
+## Open items from 2026-09-29
+- **Kodi box was offline at the end of the session** (no ARP reply at 192.168.1.181, full
+  /24 scan found no LibreELEC host). The WNBA channels are in the profile M3U but the client
+  has not loaded them yet — verify on the box: guide should show `Sports: WNBA` 368–375 and
+  both Aces–Fever (368) and Lynx–Liberty (369) should play.
+- **Kodi box has no SSH** (port 22 unreachable) — only JSON-RPC on 8080. Forcing a playlist
+  reload from outside is therefore impossible; a reboot/restart on the box (or the 10-min
+  timer) is the only way. Worth enabling SSH in LibreELEC settings.
+- **Kodi client IP drifts** (DHCP). If JSON-RPC stops answering, scan for the box rather than
+  assuming it is down.
+- Confirm whether the client's IPTV Simple refresh interval is really 10 min: README's
+  component table still says 51 min, `activeContext` says it was changed to 10.
+- **First VOD sync was still running at session end** (batch 1/2: 4,060 movies, 1,998 series);
+  check `/XtreamLibrary/Progress` and that `VOD Movies`/`VOD Series` populate, then confirm
+  Kodi sees them through `jellyfin-kodi`.
 
 ## Not yet decided / optional
 - **`*arr` suite** (Prowlarr + Sonarr + Radarr + Seerr) — libraries are empty; needs a

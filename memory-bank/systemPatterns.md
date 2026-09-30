@@ -21,8 +21,20 @@
 - **Jellyfin 10.11 plugin loading**: flat DLLs in `plugins/` are ignored; plugins need a
   `Name_version/` subfolder with the DLL + a `meta.json`. "Failed to load assembly ...
   incompatible version" = shared-library mismatch; try the next-oldest release.
-- **jellyfin-kodi does not sync Jellyfin "channels"** — only native libraries. Any provider
-  content that must reach Kodi has to land in Movies/TVShows libraries (STRM files work).
+- **`hidden_from_output=True` beats profile membership.** A channel can be enabled in a
+  profile and still never appear in that profile's M3U; the output builder filters hidden
+  channels. The provider's PPV event slots ship hidden (2026-09-21 cleanup) — unhide them.
+- **The profile rebuild owns the membership list.** `build-kodi-profile.py` disables every
+  membership it does not recognise, and sweeps any row without upcoming EPG to `No Guide`
+  unless it is curated. A new group needs entries in `KODI_GROUPS` (adoption) *and*
+  `CURATED_GROUPS` (sweep exemption) or the next run silently removes it.
+- **`channel_number` is not unique across Dispatcharr.** Curated numbers can collide with
+  provider-assigned ones (e.g. 368–375 are both WNBA slots and a PRIME group); harmless while
+  only one of them is a profile member, but check before renumbering.
+- **Kodi box: no SSH, DHCP address, only JSON-RPC.** Port 22 is closed on the LibreELEC box,
+  so nothing can force an IPTV Simple playlist reload from outside (Kodi 21 has no JSON-RPC
+  method for it). If JSON-RPC stops answering, scan the subnet before assuming the box is up
+  — the last outage was the box being off, not the stack.
 - **`max_streams` is Dispatcharr's own cap**, not the provider's. Was 1 (caused 503s on every
   zap), now 2.
 - **Retries are hardcoded in-container** (`apps/proxy/config.py`: `MAX_RETRIES=3`,

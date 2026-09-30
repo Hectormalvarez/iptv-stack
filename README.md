@@ -162,6 +162,47 @@ consumed directly by a Jellyfin plugin instead.
 - **Scheduled sync**: daily 04:30 (plugin task "Sync Xtream Library"), incremental with a
   full re-sync weekly. Manual trigger: `POST /XtreamLibrary/Sync` (admin token),
   status via `/XtreamLibrary/Progress`.
+- **Category selection** (deliberately limited — not the full 28.7k catalog):
+  `scripts/pick-xtream-categories.py` reads the provider's category dump and keeps the
+  English/Western "best of" — flagship brand libraries (Netflix/Disney+/Apple+/Amazon/
+  HBO Max movies, series and kids), their 4K/Dolby variants, and the English content sets
+  (EN - …, IMDB TOP 250, MARVEL, 007, PARAMOUNT, UNIVERSAL, DREAMWORKS, TOP MOVIES).
+  Foreign regions/languages, multi-sub shelves and niche shelves (docu/music/podcast/
+  reality/stand-up/anime/HEVC/workout) are dropped, as is anything marked adult.
+  Current selection: **46 movie categories + 26 series categories** (~4k movies and ~2k
+  series per batch run, vs the provider's 28,751/8,657). Adjust the regexes there and
+  re-apply via the plugin config API.
+
+## Sports event slots in the guide (NFL, WNBA, …) (2026-09-29)
+
+The provider sells live games as **PPV event slots** — reusable channel numbers whose names
+rotate to whatever fixture is on next. They are wired into the Kodi profile so games appear
+in the guide with real fixture names:
+
+| Sport | Channels | Script |
+|---|---|---|
+| NFL/NBA/MLB slots | 341–367 | `build-kodi-profile.py` `EVENTS` (static slot names, e.g. "NFL Live 1") |
+| WNBA | 368–375, group `Sports: WNBA` | `scripts/add-wnba-events.py` |
+
+- `add-wnba-events.py` re-resolves fixtures on every run: it reads
+  `US (WNBA NN) | <away> at <home> (<date>)` slot names, renames the channel through
+  `ChannelOverride.name` (durable — provider syncs rewrite `Channel.name`),
+  re-homes it into `Sports: WNBA`, enables it in the Kodi profile and, when a second
+  same-date feed exists, attaches it as a failover stream (a single stream dies at the
+  provider's hourly reset). Only fixtures dated today or later are touched.
+- These slots carry **no EPG** (provider XC EPG for them is empty), so the guide renders the
+  channel name — same as the NFL slots.
+- **Two gotchas that bit while wiring this up:**
+  1. Provider PPV slots ship with `hidden_from_output=True` (they were hidden in the
+     2026-09-21 cleanup). A hidden channel is silently excluded from the profile M3U —
+     membership alone is not enough. Unhide before expecting it in the guide.
+  2. `build-kodi-profile.py` **disables any membership it does not recognise**. A new group
+     must be listed in its `KODI_GROUPS`, and if it has no EPG it must also be in
+     `CURATED_GROUPS` (otherwise the no-guide sweep files it under "No Guide" 9001+).
+     `Sports: WNBA` is in both.
+- Slot numbers are not reserved globally: the provider also numbers some of its own channels
+  368–375 (a PRIME group), which is harmless because those channels are not Kodi profile
+  members — but check for collisions before renumbering anything.
 
 ### Gotchas learned while setting this up (2026-09-29)
 

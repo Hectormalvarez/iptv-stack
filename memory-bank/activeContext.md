@@ -2,23 +2,38 @@
 
 ## Where things stand
 The stack works end to end and is being used. Kodi boots into the TV guide, zaps by channel
-number, plays NFL RedZone continuously with 3 failover sources, and every NFL game slot is
-labelled with its fixture. The provider's VOD catalog is being wired into Jellyfin via the
-Xtream Library plugin (see README *Provider VOD library → Jellyfin*) — wiring complete,
-first smoke-test sync pending the provider lifting a temporary API rate-limit block.
+number, plays NFL RedZone with 3 failover sources, and every NFL game slot is labelled with
+its fixture. Two new workstreams landed this session: the provider's VOD catalog is being
+imported into Jellyfin (first sync running), and WNBA games are now wired into the guide.
 
-## Provider VOD wiring (2026-09-29, in progress)
-- Chose **Xtream Library** (firestaerter3, STRM-based) over Kevinjil's Jellyfin.Xtream:
-  channels-type content does NOT sync to Kodi via jellyfin-kodi; STRM files become native
-  libraries that do. v1.55.3.0 = newest ABI-10.11 build that loads (v2.0.9.0 fails even
-  though its build.yaml says 10.11).
-- Plugin config + category selection + the two Jellyfin libraries (`VOD Movies`,
-  `VOD Series`) are in place; Daily 04:30 sync scheduled.
-- Gotcha: the plugin's "all categories" first sync hammers `player_api` and trips a
-  Cloudflare 403 IP block (~15–45 min). Selection trimmed to 3 categories and settings
-  gentled (250 ms delay, parallelism 3) before retry. Details: README section.
-- Jellyfin `root` password was reset (user request; was never stored). New value given to
-  the user, MustUpdatePassword set — not stored in the repo.
+## WNBA event slots (2026-09-29)
+- 8 upcoming fixtures (Sep 29 – Oct 2) resolved from the provider's `US (WNBA NN) | <away> at
+  <home> (<date>)` slots into group **`Sports: WNBA` at 368–375**, named via
+  `ChannelOverride.name`, with a same-date failover feed attached where one exists.
+- **Blockers found and fixed:** the provider's PPV slots are `hidden_from_output=True` (so
+  membership alone did nothing — the profile M3U kept excluding them), and
+  `build-kodi-profile.py` would have dropped the new group on its next run. `Sports: WNBA`
+  is now in `KODI_GROUPS` + `CURATED_GROUPS`.
+- Verified: profile M3U = 1,677 channels and contains both games with clean names.
+- **Not verified:** the Kodi client never loaded them — the box was offline (no ARP, no SSH,
+  full /24 scan clean). It also means the earlier playback attempt via a raw TS URL was cut
+  short by the client, not by the provider (provider feed was healthy: 29 MB/6 s).
+- To play the live game once the box is back: guide → `Sports: WNBA` → 368
+  (`WNBA: Las Vegas Aces at Indiana Fever`), or JSON-RPC `Player.Open` on the channel id.
+
+## Provider VOD → Jellyfin (2026-09-29)
+- Xtream Library plugin v1.55.3.0 (STRM → native libraries, so `jellyfin-kodi` syncs it),
+  `VOD Movies` + `VOD Series` libraries, STRM output at `/mnt/storage/vod-strm`.
+- Category selection limited to an English "best of" (46 movie + 26 series categories) rather
+  than the full 28.7k/8.7k catalog; picker lives in `scripts/pick-xtream-categories.py`.
+- First sync was running at session end (batch 1/2: 4,060 movies, 1,998 series; ~6.9k STRM
+  files already written). Check `/XtreamLibrary/Progress` next session and confirm the
+  libraries populate in Jellyfin and Kodi.
+- Lesson: the plugin's all-category defaults fire ~11k API calls and trip Cloudflare's
+  403 block on the whole IP for ~1 h (live streams unaffected). Keep the selection tight and
+  `RequestDelayMs=250`, `SyncParallelism=3`.
+- Jellyfin `root` password was reset (user request; was never stored). New value given to the
+  user, `MustUpdatePassword` set — not stored in the repo.
 
 ## 2026-09-29 provider outage (earlier, resolved)
 - MNF night: Kodi couldn't play the game. Root cause was a **provider-wide outage** — every
