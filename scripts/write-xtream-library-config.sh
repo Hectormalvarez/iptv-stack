@@ -28,7 +28,9 @@ sudo -n tee "$CFG" > /dev/null <<XML
   <Providers />
   <SyncIntervalMinutes>60</SyncIntervalMinutes>
   <TriggerLibraryScan>true</TriggerLibraryScan>
-  <SyncScheduleType>Daily</SyncScheduleType>
+  <!-- Manual, not Daily: the scheduled sync trips the provider's abuse block (403s our
+       IPv4 and kills live TV). Run it via scripts/sync-vod.sh instead. -->
+  <SyncScheduleType>Manual</SyncScheduleType>
   <SyncDailyHour>4</SyncDailyHour>
   <SyncDailyMinute>30</SyncDailyMinute>
   <EnableMetadataLookup>true</EnableMetadataLookup>
