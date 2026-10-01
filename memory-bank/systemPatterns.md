@@ -16,6 +16,15 @@
 - **Provider-wide stream/API failures are usually the provider, not the stack.** Before
   touching bindings, curl 2+ unrelated channels' URLs: 502-on-all = origin outage (wait);
   403-on-player_api-only = rate limit from too many API calls (live streams keep working).
+- **A 403 on *every* endpoint (including live streams) can be address-family-specific.**
+  2026-10-01: `cf.vovu.top` 403'd our egress **IPv4** but served **IPv6** (`curl -4` → 403,
+  `curl -6` → 302, same URL/UA/host). A bridge container has **no IPv6 route**, so it could
+  only try IPv4 and *everything* failed while the host looked fine. Diagnose by comparing
+  families on the host, then check what the container can actually reach:
+  `docker exec dispatcharr sh -lc 'getent ahosts cf.vovu.top; ip -6 route'` (empty `ip -6
+  route` = no IPv6 egress). Fix is `network_mode: host` for Dispatcharr, not a provider wait.
+  The trigger was the Xtream-Library VOD sync hammering `player_api.php`; the resulting ban
+  outlived the documented ~15–45 min and escalated to live streams.
   The Xtream Library plugin with "all categories" selected trips the 403 block — keep the
   category selection tight and `RequestDelayMs` ≥ 250 until proven stable.
 - **Jellyfin 10.11 plugin loading**: flat DLLs in `plugins/` are ignored; plugins need a

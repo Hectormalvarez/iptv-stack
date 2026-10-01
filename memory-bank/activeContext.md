@@ -1,10 +1,29 @@
-# Active Context (2026-09-29)
+# Active Context (2026-10-01)
 
 ## Where things stand
-The stack works end to end and is being used. Kodi boots into the TV guide, zaps by channel
-number, plays NFL RedZone with 3 failover sources, and every NFL game slot is labelled with
-its fixture. Two new workstreams landed this session: the provider's VOD catalog is being
-imported into Jellyfin (first sync running), and WNBA games are now wired into the guide.
+Live TV is working again after a ~2-day provider-egress outage (see below). Everything else is
+where it was on 2026-09-29: Kodi boots into the TV guide and zaps by number, the provider's VOD
+catalog is imported into Jellyfin, and WNBA/NFL event slots are wired in.
+
+## 2026-10-01: every channel 403'd (provider IPv4 block) — fixed
+- **Symptom:** Kodi opened nothing; `dispatcharr` logged `HTTP error 403 Forbidden` on every
+  provider stream URL; the `STRONG8K` EPG source went `status: error` (403).
+- **Root cause:** the provider front `cf.vovu.top` returned **403 to our egress IPv4** on *every*
+  endpoint (streams, `get.php`, `player_api`, `xmltv`) while **IPv6 worked** — same URL, same
+  pinned `TiviMate` UA, same host; only the address family differed (`curl -4` → 403,
+  `curl -6` → 302). A third-party IPv4 fetch of the web root returned 401, so it is a block on
+  *this host's IPv4*, not IPv4 in general (403 body came from the provider's own CDN front).
+- **Why only Dispatcharr broke:** the host has routable IPv6 and prefers it, so host `curl`
+  worked; the bridged `dispatcharr` container had **no IPv6 route** and could only try the
+  blocked IPv4.
+- **Likely trigger:** the Xtream-Library VOD sync hammering `player_api.php` (first 403 burst
+  2026-09-29 23:44). This ban outlived the documented ~15–45 min and escalated to live streams.
+- **Fix (commit `ed272f9`):** `dispatcharr` → `network_mode: host`; Jellyfin keeps
+  `http://dispatcharr:9191/...` via `extra_hosts: dispatcharr=172.18.0.1`; `media-net` subnet
+  pinned so that gateway is deterministic.
+- **Verified:** proxy stream 200 (21 MB), Kodi playing ch 1581 with `time` advancing at
+  `speed: 1`, **0** 403s, and `STRONG8K` EPG refresh now `success` (45,033 programs).
+- **Still open:** Jellyfin's own VOD sync is IPv4-only and keeps failing daily.
 
 ## WNBA event slots (2026-09-29)
 - 8 upcoming fixtures (Sep 29 – Oct 2) resolved from the provider's `US (WNBA NN) | <away> at

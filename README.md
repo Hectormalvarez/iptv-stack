@@ -16,6 +16,50 @@ Xtream Codes portal: `http://cf.vovu.top` — credentials live in Dispatcharr's 
 - The `get.php` M3U endpoint returns empty for plain curl; Dispatcharr imports via the XC API (`type=XC`), which works fine.
 - The XMLTV EPG (`/xmltv.php`) contains 4,423 channels with IDs like `SkySportsNews.uk` — country-suffixed, and mostly **not** matching the XC stream `tvg-id`s. Bulk name matching is required (below).
 
+### Provider egress: this host's IPv4 is 403'd, IPv6 works (fixed 2026-10-01)
+
+Every channel stopped opening. The provider front `cf.vovu.top` (behind Cloudflare) returned
+**403 Forbidden** to our egress **IPv4**, while **IPv6 worked** — same URL, same pinned
+`TiviMate` User-Agent, same host:
+
+```bash
+curl -4 -o /dev/null -w '%{http_code}\n' "http://cf.vovu.top/live/<u>/<p>/2162814.ts"   # 403
+curl -6 -o /dev/null -w '%{http_code}\n' "http://cf.vovu.top/live/<u>/<p>/2162814.ts"   # 302
+```
+
+It was **not** IPv4-in-general: fetching the web root from a third-party IPv4 returns 401
+(normal), so the 403 is a block on **this host's IPv4 specifically**. The 403 body comes from
+the provider's own CDN front (`Server: a1`, *"Powered by CDN PROXY SERVICE / tengine"*), i.e.
+the origin is rejecting us, not Cloudflare's edge.
+
+- **Why:** almost certainly the provider's abuse block from the daily Xtream-Library VOD sync,
+  which fires a large number of `player_api.php` calls (see *Provider VOD library*). The earlier
+  block was documented as ~15–45 min; this one persisted for days **and**, unlike the earlier
+  one, also blocked **live streams**, so nothing played.
+- **Why it broke Dispatcharr and not the host:** the host has a routable IPv6 address and
+  prefers IPv6, so its `curl` worked. The `dispatcharr` container was on the bridge `media-net`
+  network, which has **no IPv6 route**, so it could only try IPv4 and every upstream fetch got
+  403. This also took the `STRONG8K` EPG source down (`status: error`, HTTP 403) and dragged
+  guide coverage down with it.
+- **Fix:** run Dispatcharr with **`network_mode: host`** so it shares the host network stack
+  (including the working IPv6 path). Port 9191 is then bound directly on the host, so `ports:`
+  is dropped. Jellyfin stays on `media-net` and keeps its `http://dispatcharr:9191/...`
+  tuner/EPG URLs via an explicit `extra_hosts` alias to the media-net gateway (172.18.0.1 = the
+  host); `media-net`'s subnet is pinned so that gateway is deterministic.
+
+Verify after any networking change:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' --max-time 25 \
+  http://localhost:9191/proxy/ts/stream/<channel-uuid>          # 200, tens of MB
+docker exec dispatcharr sh -lc 'getent ahosts cf.vovu.top | head -1'   # a 2606:4700:… address
+```
+
+**Still open:** the VOD sync runs inside Jellyfin (also bridged, IPv4-only), so its daily 04:30
+run keeps hitting the blocked IPv4 and failing. Until Jellyfin is moved to host networking too
+(or the sync is throttled/paused), expect the provider ban to stay warm and the VOD libraries
+to churn. Live TV is unaffected by that.
+
 ## EPG pipeline (reworked 2026-09-26)
 
 Three EPG sources feed Dispatcharr:

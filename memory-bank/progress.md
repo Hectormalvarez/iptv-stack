@@ -19,7 +19,11 @@
   libraries over STRM files in `/mnt/storage/vod-strm`; category selection limited to the
   English "best of" (46 movie + 26 series categories); daily 04:30 sync
 - **Ops**: `verify-stack.sh` healthy, 5 cron jobs, drift guards (idempotent + safety-abort scripts)
-- **Repo**: 46 conventional commits, credentials kept out of git
+- **Live TV outage fixed (2026-10-01)**: the provider 403'd this host's IPv4 on every endpoint
+  while IPv6 worked; Dispatcharr moved to `network_mode: host` (commit `ed272f9`). Verified:
+  proxy stream 200 (21 MB), Kodi playing ch 1581 at `speed: 1`, 0 403s, `STRONG8K` EPG back to
+  `success`
+- **Repo**: 47 conventional commits, credentials kept out of git
 
 ## Pending — the one operational step left ⚠️
 - **Re-run the No-Guide sweep.** It was deferred while the EPG harvest drained (the harvest is
@@ -31,12 +35,16 @@
   ```
   Then refresh Jellyfin's guide. Until this runs, blank channels still sit inside
   `Mexico VIP` / `Sports: …` groups.
+- **Jellyfin's VOD sync is still IPv4-only** (2026-10-01). It runs in the bridged Jellyfin
+  container, so the daily 04:30 run keeps hitting the provider's blocked IPv4 — the same ban
+  that took live TV down. Move Jellyfin to `network_mode: host` too (tuner → `127.0.0.1:9191`)
+  or throttle/pause the sync, so the ban can cool. Live TV is unaffected by this.
 
 ## Open items from 2026-09-29
-- **Kodi box was offline at the end of the session** (no ARP reply at 192.168.1.181, full
-  /24 scan found no LibreELEC host). The WNBA channels are in the profile M3U but the client
-  has not loaded them yet — verify on the box: guide should show `Sports: WNBA` 368–375 and
-  both Aces–Fever (368) and Lynx–Liberty (369) should play.
+- **Kodi box is back online** (2026-10-01): reachable at 192.168.1.181 (Kodi 21.3), PVR loaded
+  with 1,677 channels / 23 groups including `Sports: WNBA`. It streams again after the
+  2026-10-01 networking fix (verified playing ch 1581). Earlier it had been offline (no ARP,
+  full /24 scan clean) — the WNBA channels were in the profile M3U but unloaded at the time.
 - **Kodi box has no SSH** (port 22 unreachable) — only JSON-RPC on 8080. Forcing a playlist
   reload from outside is therefore impossible; a reboot/restart on the box (or the 10-min
   timer) is the only way. Worth enabling SSH in LibreELEC settings.
