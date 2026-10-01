@@ -34,10 +34,10 @@ services:
     image: jellyfin/jellyfin:latest
     container_name: jellyfin
     restart: unless-stopped
-    ports:
-      - "8096:8096"
-      # Client auto-discovery
-      - "7359:7359/udp"
+    # Host networking, same reason as Dispatcharr: the provider 403s our IPv4 but serves
+    # IPv6, and the Xtream VOD sync (run by hand now) talks to the provider directly. A
+    # bridge container has no IPv6 route. Ports 8096/7359 are bound directly on the host.
+    network_mode: host
     volumes:
       - ./jellyfin/config:/config
       - ./jellyfin/cache:/cache
@@ -52,13 +52,10 @@ services:
     environment:
       # Guide/recording timers and logs read local time
       - TZ=America/Chicago
-    # Dispatcharr moved to host networking, so its media-net alias is gone. 172.18.0.1
-    # is the media-net gateway (the host), where Dispatcharr's 9191 is now bound. This
-    # keeps Jellyfin's tuner/EPG URLs (http://dispatcharr:9191/...) working unchanged.
+    # Keep the tuner/EPG URLs (http://dispatcharr:9191/...) unchanged: on the shared host
+    # netns "dispatcharr" is just loopback, where the host-networked Dispatcharr listens.
     extra_hosts:
-      - "dispatcharr:172.18.0.1"
-    networks:
-      - media-net
+      - "dispatcharr:127.0.0.1"
     stop_grace_period: 30s
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8096/health || exit 1"]
@@ -85,11 +82,7 @@ services:
       - media-net
 
 networks:
+  # Dispatcharr and Jellyfin now run on host networking; only watchstate is left here.
   media-net:
     name: media-net
     driver: bridge
-    # Pinned so the gateway (172.18.0.1) that Jellyfin's `extra_hosts` alias uses to
-    # reach the host-networked Dispatcharr is deterministic across re-creates.
-    ipam:
-      config:
-        - subnet: 172.18.0.0/16
