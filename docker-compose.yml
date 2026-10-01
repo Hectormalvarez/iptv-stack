@@ -3,8 +3,11 @@ services:
     image: ghcr.io/dispatcharr/dispatcharr:latest
     container_name: dispatcharr
     restart: unless-stopped
-    ports:
-      - "9191:9191"
+    # Host networking: the provider front (cf.vovu.top, behind Cloudflare) answers our
+    # IPv4 egress with 403 but serves IPv6, and a bridge container has no IPv6 route.
+    # Sharing the host netns gives Dispatcharr the host's working IPv6 path. Port 9191
+    # is therefore bound directly on the host; `ports:` is not allowed with host mode.
+    network_mode: host
     volumes:
       - ./dispatcharr/data:/data
       # DVR output lands on the big disk; Jellyfin can read it via /recordings
@@ -20,8 +23,6 @@ services:
       - REDIS_HOST=localhost
       - CELERY_BROKER_URL=redis://localhost:6379/0
       - DISPATCHARR_LOG_LEVEL=info
-    networks:
-      - media-net
     stop_grace_period: 30s
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:9191/api/core/ping/ || exit 1"]
@@ -51,6 +52,11 @@ services:
     environment:
       # Guide/recording timers and logs read local time
       - TZ=America/Chicago
+    # Dispatcharr moved to host networking, so its media-net alias is gone. 172.18.0.1
+    # is the media-net gateway (the host), where Dispatcharr's 9191 is now bound. This
+    # keeps Jellyfin's tuner/EPG URLs (http://dispatcharr:9191/...) working unchanged.
+    extra_hosts:
+      - "dispatcharr:172.18.0.1"
     networks:
       - media-net
     stop_grace_period: 30s
@@ -82,3 +88,8 @@ networks:
   media-net:
     name: media-net
     driver: bridge
+    # Pinned so the gateway (172.18.0.1) that Jellyfin's `extra_hosts` alias uses to
+    # reach the host-networked Dispatcharr is deterministic across re-creates.
+    ipam:
+      config:
+        - subnet: 172.18.0.0/16
