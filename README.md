@@ -41,11 +41,11 @@ the origin is rejecting us, not Cloudflare's edge.
   network, which has **no IPv6 route**, so it could only try IPv4 and every upstream fetch got
   403. This also took the `STRONG8K` EPG source down (`status: error`, HTTP 403) and dragged
   guide coverage down with it.
-- **Fix:** run Dispatcharr with **`network_mode: host`** so it shares the host network stack
-  (including the working IPv6 path). Port 9191 is then bound directly on the host, so `ports:`
-  is dropped. Jellyfin stays on `media-net` and keeps its `http://dispatcharr:9191/...`
-  tuner/EPG URLs via an explicit `extra_hosts` alias to the media-net gateway (172.18.0.1 = the
-  host); `media-net`'s subnet is pinned so that gateway is deterministic.
+- **Fix:** run **both** Dispatcharr and Jellyfin with **`network_mode: host`** so they share the
+  host network stack (including the working IPv6 path). Ports 9191/8096/7359 are then bound
+  directly on the host, so `ports:` is dropped. Jellyfin keeps its `http://dispatcharr:9191/...`
+  tuner/EPG URLs via an `extra_hosts` alias of `dispatcharr` to loopback. Only watchstate is
+  left on `media-net`.
 
 Verify after any networking change:
 
@@ -55,10 +55,9 @@ curl -s -o /dev/null -w '%{http_code}\n' --max-time 25 \
 docker exec dispatcharr sh -lc 'getent ahosts cf.vovu.top | head -1'   # a 2606:4700:… address
 ```
 
-**Still open:** the VOD sync runs inside Jellyfin (also bridged, IPv4-only), so its daily 04:30
-run keeps hitting the blocked IPv4 and failing. Until Jellyfin is moved to host networking too
-(or the sync is throttled/paused), expect the provider ban to stay warm and the VOD libraries
-to churn. Live TV is unaffected by that.
+**Follow-up (done):** the VOD sync runs inside the Jellyfin container, which was bridged and
+therefore IPv4-only, so its daily run kept hitting the blocked IPv4. Jellyfin now uses host
+networking too, and the scheduled sync is **off** — see *Provider VOD library*.
 
 ## EPG pipeline (reworked 2026-09-26)
 
@@ -203,9 +202,15 @@ consumed directly by a Jellyfin plugin instead.
   `Providers[0].SelectedVodCategoryIds` / `SelectedSeriesCategoryIds` via JSON instead.
 - **Live TV in the plugin is OFF** (`EnableLiveTv=false`) — live TV stays on the
   Dispatcharr M3U tuner.
-- **Scheduled sync**: daily 04:30 (plugin task "Sync Xtream Library"), incremental with a
-  full re-sync weekly. Manual trigger: `POST /XtreamLibrary/Sync` (admin token),
-  status via `/XtreamLibrary/Progress`.
+- **No scheduled sync — run it by hand.** The plugin's dropdown only offers `Interval`/`Daily`
+  (no "off"), but its config accepts **`SyncScheduleType=Manual`**, which makes it register
+  **no** trigger at startup — verified by the `Daily trigger for Sync Xtream Library ...` line
+  disappearing from the Jellyfin log. The config is
+  `jellyfin/config/plugins/configurations/Jellyfin.Xtream.Library.xml`.
+  **Why manual:** the sync fires thousands of `player_api.php` calls and trips the provider's
+  abuse block, which 403s our IPv4 on every endpoint and takes live TV down with it (see
+  *Provider egress*). Trigger a run with `scripts/sync-vod.sh` (or the plugin page's *Manual
+  Sync* button); endpoint `POST /XtreamLibrary/Sync`, progress `/XtreamLibrary/Progress`.
 - **Category selection** (deliberately limited — not the full 28.7k catalog):
   `scripts/pick-xtream-categories.py` reads the provider's category dump and keeps the
   English/Western "best of" — flagship brand libraries (Netflix/Disney+/Apple+/Amazon/

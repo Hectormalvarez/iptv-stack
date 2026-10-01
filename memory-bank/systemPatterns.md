@@ -44,8 +44,12 @@
   so nothing can force an IPTV Simple playlist reload from outside (Kodi 21 has no JSON-RPC
   method for it). If JSON-RPC stops answering, scan the subnet before assuming the box is up
   — the last outage was the box being off, not the stack.
-- **`max_streams` is Dispatcharr's own cap**, not the provider's. Was 1 (caused 503s on every
-  zap), now 2.
+- **`max_streams` is Dispatcharr's own cap**, not the provider's. 1 caused 503s on every zap
+  (→ 2 on 2026-09-21). Raised to **3** on 2026-10-01: with 2 a single zap already holds
+  old+new, so there is **zero headroom** and any lingering/failed init — or Jellyfin's tuner
+  taking a slot — 503s the next zap. A direct test showed the provider serves 3 concurrent
+  streams. Symptom to recognise: `Profile 2 at max connections: 2/2` then
+  `No stream available ... All active M3U profiles have reached maximum connection limits`.
 - **Retries are hardcoded in-container** (`apps/proxy/config.py`: `MAX_RETRIES=3`,
   `RETRY_WAIT_INTERVAL=0.5`) — no env/DB override, so tuning them is not persistent. Data-level
   fixes (backups) were chosen instead.

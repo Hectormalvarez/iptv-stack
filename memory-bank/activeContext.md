@@ -23,7 +23,11 @@ catalog is imported into Jellyfin, and WNBA/NFL event slots are wired in.
   pinned so that gateway is deterministic.
 - **Verified:** proxy stream 200 (21 MB), Kodi playing ch 1581 with `time` advancing at
   `speed: 1`, **0** 403s, and `STRONG8K` EPG refresh now `success` (45,033 programs).
-- **Still open:** Jellyfin's own VOD sync is IPv4-only and keeps failing daily.
+- **Follow-ups done this session:** the Xtream VOD sync's daily trigger was removed
+  (`SyncScheduleType=Manual` — no trigger is registered at startup) and is now run by hand via
+  `scripts/sync-vod.sh`; Jellyfin also moved to host networking so that manual sync has IPv6;
+  the STRONG8K profile's `max_streams` went 2 → 3 because with 2 a single zap already filled the
+  cap and every extra zap 503'd.
 
 ## WNBA event slots (2026-09-29)
 - 8 upcoming fixtures (Sep 29 – Oct 2) resolved from the provider's `US (WNBA NN) | <away> at

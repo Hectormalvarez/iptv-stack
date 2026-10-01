@@ -17,12 +17,16 @@
   reset (2026-09-29; new password held by the user, not in git)
 - **Provider VOD → Jellyfin**: Xtream Library plugin v1.55.3.0, `VOD Movies` + `VOD Series`
   libraries over STRM files in `/mnt/storage/vod-strm`; category selection limited to the
-  English "best of" (46 movie + 26 series categories); daily 04:30 sync
+  English "best of" (46 movie + 26 series categories); on-demand sync (no schedule)
 - **Ops**: `verify-stack.sh` healthy, 5 cron jobs, drift guards (idempotent + safety-abort scripts)
 - **Live TV outage fixed (2026-10-01)**: the provider 403'd this host's IPv4 on every endpoint
-  while IPv6 worked; Dispatcharr moved to `network_mode: host` (commit `ed272f9`). Verified:
-  proxy stream 200 (21 MB), Kodi playing ch 1581 at `speed: 1`, 0 403s, `STRONG8K` EPG back to
-  `success`
+  while IPv6 worked; **both** Dispatcharr and Jellyfin moved to `network_mode: host`
+  (`ed272f9`, `58ff0f3`). Verified: proxy stream 200 (21 MB), Kodi playing at `speed: 1`,
+  0 403s, `STRONG8K` EPG back to `success`, Jellyfin egress now IPv6
+- **Xtream VOD sync is now manual (2026-10-01)**: daily 04:30 trigger removed
+  (`SyncScheduleType=Manual`), run on demand via `scripts/sync-vod.sh` (`3e60497`)
+- **Zapping fixed (2026-10-01)**: provider profile `max_streams` 2 → 3 — with 2 a single zap
+  already filled the cap, so extra zaps 503'd
 - **Repo**: 47 conventional commits, credentials kept out of git
 
 ## Pending — the one operational step left ⚠️
@@ -35,10 +39,8 @@
   ```
   Then refresh Jellyfin's guide. Until this runs, blank channels still sit inside
   `Mexico VIP` / `Sports: …` groups.
-- **Jellyfin's VOD sync is still IPv4-only** (2026-10-01). It runs in the bridged Jellyfin
-  container, so the daily 04:30 run keeps hitting the provider's blocked IPv4 — the same ban
-  that took live TV down. Move Jellyfin to `network_mode: host` too (tuner → `127.0.0.1:9191`)
-  or throttle/pause the sync, so the ban can cool. Live TV is unaffected by this.
+- _(resolved 2026-10-01)_ Jellyfin's VOD sync is now IPv6-capable (host networking) **and** has
+  no schedule — run it by hand with `scripts/sync-vod.sh`.
 
 ## Open items from 2026-09-29
 - **Kodi box is back online** (2026-10-01): reachable at 192.168.1.181 (Kodi 21.3), PVR loaded

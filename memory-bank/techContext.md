@@ -4,10 +4,10 @@
 - LibreELEC **12.2.1**, Kodi **21.3 Omega**, Intel Tiger Lake iGPU (Iris Xe, VAAPI works)
 - Dispatcharr / Jellyfin `:latest` images (pinning was deliberately deferred)
 - Jellyfin **10.11.11**, Kodi Sync Queue plugin **15.0.0.0** (must match server ABI)
-- Dispatcharr runs with **`network_mode: host`** (2026-10-01): the provider front 403s this
-  host's IPv4 on every endpoint but serves IPv6, and a bridge container has no IPv6 route.
-  Jellyfin stays on `media-net` and reaches it via `extra_hosts: dispatcharr=172.18.0.1`
-  (media-net subnet pinned). See README *Provider egress*.
+- Dispatcharr **and Jellyfin** run with **`network_mode: host`** (2026-10-01): the provider
+  front 403s this host's IPv4 on every endpoint but serves IPv6, and a bridge container has no
+  IPv6 route. Jellyfin keeps `http://dispatcharr:9191/...` via `extra_hosts: dispatcharr=127.0.0.1`.
+  Only watchstate is left on `media-net`. See README *Provider egress*.
 
 ## The client
 - Boots **straight into the TV guide** (`lookandfeel.startupwindow = 10702`)
