@@ -70,6 +70,22 @@
 - **Retries are hardcoded in-container** (`apps/proxy/config.py`: `MAX_RETRIES=3`,
   `RETRY_WAIT_INTERVAL=0.5`) — no env/DB override, so tuning them is not persistent. Data-level
   fixes (backups) were chosen instead.
+- **The provider `xmltv` feed is short-horizon, so a stalled EPG refresh empties the guide fast.**
+  `cf.vovu.top/xmltv.php` only carries ~11–14 h of programmes for the *mapped* channels, so the
+  6-hourly refresh is the lifeline: a couple of missed runs and the guide drains to 0 for those
+  channels (2026-10-04: coverage 98% → 10% after refreshes 403'd since the prior day). The programmes
+  are **not wiped** — they age out (`ProgramData.max_end` freezes at the last successful parse). Recover
+  by dispatching Dispatcharr's **own** `refresh_epg_data.delay(<id>, force=True)` (the UI refresh icon /
+  `POST /api/epg/import/`); it re-downloads, re-parses and rebuilds the index. Verify with
+  `EPGSource.status == 'success'`, a future `max_end`, and `verify-stack.sh`.
+- **`/app/media` (MEDIA_ROOT, incl. `cached_epg/<id>.xml`) is ephemeral by design.** The official
+  compose mounts only `/data`; the image's `docker/init/03-init-dispatcharr.sh` lists `/app/media` and
+  `/app/static` under `APP_DIRS` ("live on the image layer"). So a container recreate wipes the cached
+  EPG XML and `build_programme_index` logs `File not found for source N` until the next successful
+  refresh — expected, **not** a bug to fix by mounting a volume.
+- **M3U accounts refresh via `refresh_single_m3u_account.delay(<id>)`** (the UI refresh button); the XC
+  account processes the full live catalog (~15.8k streams) in 11 batches in ~15 s. A `custom`/STD
+  account with **no URL** stays `error` forever — an orphan worth deleting.
 - **Output M3U/EPG cache TTL is 2 s**, so changes appear immediately on re-fetch.
 - Profile-scoped endpoints: `/output/m3u/<ProfileName>`, `/output/epg/<ProfileName>`.
 
