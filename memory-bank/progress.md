@@ -33,24 +33,21 @@
 - **Xtream sync stopped firing hourly (2026-10-04)**: the plugin's `Manual` schedule type still
   left an *interval* trigger, so it ran ~every 60 min and re-tripped the ban; set
   `SyncIntervalMinutes=525600` (1 year) as the only config-only stop (`3c82c59`)
+- **Guide outage recovered (2026-10-04)**: the provider's short-horizon `xmltv` feed had aged out
+  while the 6-hourly EPG refresh 403'd (pre-`gai.conf`); re-ran Dispatcharr's own `refresh_epg_data`
+  + `refresh_single_m3u_account` tasks → coverage 10% → **98%**, all three sources `success`, index
+  rebuilt, profile M3U 1,677 channels, `/output/epg/Kodi` 35,315 programmes, proxy stream 19 MB/8 s;
+  No-Guide sweep reapplied. Event labels were already current (0 changes)
 - **Repo**: 47 conventional commits, credentials kept out of git
 
-## Pending — the one operational step left ⚠️
-- **Refresh the provider fixtures once IPv4 `get.php` is clean.** The playlist hasn't refreshed
-  since ~2026-10-02 (the ban blocked it), so the NFL/event labels are stale. Force an M3U
-  refresh, then re-run `label-event-slots.py` (`LABEL_APPLY=1`) — the 09:00 cron also does it
-  daily from `Stream.name`.
-- **Re-run the No-Guide sweep.** It was deferred while the EPG harvest drained (the harvest is
-  now finished). Dry run expects **889** channels → `No Guide`, with curated picks exempt
-  (`Sports: WNBA` is now in `CURATED_GROUPS`, so the new event slots stay put).
-  ```bash
-  cd /home/hadev/Projects/Lab/iptv-stack && sed 's/^DRY_RUN = True$/DRY_RUN = False/' \
-    scripts/build-kodi-profile.py | docker exec -i dispatcharr python manage.py shell
-  ```
-  Then refresh Jellyfin's guide. Until this runs, blank channels still sit inside
-  `Mexico VIP` / `Sports: …` groups.
-- _(resolved 2026-10-01)_ Jellyfin's VOD sync is now IPv6-capable (host networking) **and** has
-  no schedule — run it by hand with `scripts/sync-vod.sh`.
+## Pending ⚠️
+- **Confirm Jellyfin's guide repopulated.** It pulls Dispatcharr's XC `xmltv.php` and refreshes on
+  its own schedule; the admin password is held by the user, so this was not forced. Check Live TV →
+  guide next session.
+- **Delete the orphan M3U account 1** (`custom`, STD, **no URL**) — it only ever reports `error` and
+  feeds nothing.
+- _(done 2026-10-04)_ provider fixtures refreshed; `label-event-slots.py` re-run (0 changes);
+  No-Guide sweep reapplied (896 parked). _(resolved 2026-10-01)_ VOD sync is manual — `scripts/sync-vod.sh`.
 
 ## Open items from 2026-09-29
 - **Kodi box is back online** (2026-10-01): reachable at 192.168.1.181 (Kodi 21.3), PVR loaded

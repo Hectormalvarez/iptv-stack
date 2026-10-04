@@ -1,5 +1,29 @@
 # Active Context (2026-10-04)
 
+## 2026-10-04 (later): guide restored — STRONG8K EPG refreshed + No-Guide sweep reapplied
+- **Symptom:** `verify-stack.sh` FAILed — EPG coverage **10%** (692/777 blank), `STRONG8K` source
+  `status=error`, both M3U accounts `error`. Live TV itself still worked.
+- **Root cause (not corruption):** the provider's `xmltv.php` feed is **short-horizon** (only ~11–14 h
+  of programmes for the mapped channels), so the 6-hourly `epg_source-refresh-1` is the lifeline.
+  It had been failing since ~2026-10-03 12:03 with the pre-`gai.conf` **403** (IPv6-first egress), so
+  no new programmes were inserted and the guide simply **aged out** — `ProgramData.max_end` was frozen
+  at 2026-10-03 22:59 UTC. The 13:46 UTC container recreate (the `gai.conf` fix) also wiped the
+  **ephemeral** `/app/media` EPG cache, but that is by design (`APP_DIRS`; `fetch_xmltv` recreates it).
+- **Fix (first-party recovery, no code change):** dispatched Dispatcharr's **own** tasks —
+  `refresh_epg_data.delay(1, force=True)` (the UI refresh icon / `POST /api/epg/import/`) and
+  `refresh_single_m3u_account.delay(2)`. Egress was already healthy: `https://cf.vovu.top/` → 401 on
+  both families, and the EPG URL fetched with the pinned `TiviMate/5.1.6` UA → 200.
+- **Verified (first-party):** `STRONG8K` `status=success` ("Parsed 48,352 programs for 885 channels"),
+  `ProgramData` future = **24,235**, `max_end` → 2026-10-06 02:40 UTC; programme index rebuilt (3,639
+  channels); M3U refresh "Streams: 2419 updated", auto-sync ok; `verify-stack.sh` → **RESULT: healthy**,
+  coverage **98%** (781 guide-expected, 13 blank); profile M3U = 1,677 channels; `/output/epg/Kodi` =
+  35,315 programmes; proxy stream pulled **19 MB in 8 s**. Reapplied the No-Guide sweep (896 parked).
+- **No-op:** `label-event-slots.py` dry run showed **0** changes (19 slots already labelled — the
+  override names are durable and match this week's fixtures).
+- **Known orphan:** M3U account 1 (`custom`, STD, **no URL**) stays `error`; it has nothing to fetch.
+- **Not done:** Jellyfin's guide refresh — it pulls Dispatcharr's XC `xmltv.php` and refreshes on its
+  own schedule (the Jellyfin admin password is held by the user, not stored).
+
 ## 2026-10-04: provider banned IPv6 (family flipped) + hourly Xtream sync disabled
 - **Symptom:** Kodi couldn't play anything; the NFL slots showed the previous week's games.
 - **Root cause — two parts:**
@@ -17,14 +41,14 @@
   (`6ff9530`); set `SyncIntervalMinutes=525600` so the sync no longer fires (`3c82c59`).
 - **Verified:** NFL Network streamed 22 MB; Kodi opened the Commanders game (ch 5208, `NFL: 9:30am
   Colts at Commanders`) with Dispatcharr showing it `active`; **0** 403s; no Xtream sync since the fix.
-- **Still open:** `get.php` was returning an odd Cloudflare `884` on IPv4, so the playlist hadn't
-  refreshed — once the IPv4 path stays clean, force an M3U refresh + re-run `label-event-slots.py`
-  to bring the fixtures current.
+- **Resolved (later 2026-10-04):** once IPv4 egress stayed clean, a forced M3U refresh + re-run of
+  `label-event-slots.py` brought the playlist current — see the section at the top.
 
 ## Where things stand
-Live TV is working again after a ~2-day provider-egress outage (see below). Everything else is
-where it was on 2026-09-29: Kodi boots into the TV guide and zaps by number, the provider's VOD
-catalog is imported into Jellyfin, and WNBA/NFL event slots are wired in.
+The guide is healthy again — 98% coverage, `verify-stack.sh` RESULT: healthy (2026-10-04). Kodi boots
+into the TV guide and zaps by number, the provider's VOD catalog is imported into Jellyfin, and
+WNBA/NFL event slots are wired in. Live playback was re-verified end-to-end through the proxy
+(19 MB in 8 s) this session.
 
 ## 2026-10-01: every channel 403'd (provider IPv4 block) — fixed
 - **Symptom:** Kodi opened nothing; `dispatcharr` logged `HTTP error 403 Forbidden` on every
