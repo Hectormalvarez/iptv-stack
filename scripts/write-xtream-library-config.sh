@@ -26,10 +26,15 @@ sudo -n tee "$CFG" > /dev/null <<XML
 <?xml version="1.0" encoding="utf-8"?>
 <PluginConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
   <Providers />
-  <SyncIntervalMinutes>60</SyncIntervalMinutes>
+  <!-- 525600 min = 1 year: effectively disables the automatic sync. The plugin's
+       GetDefaultTriggers() ALWAYS registers a trigger — "Daily" gives a daily one and
+       every other value (including "Manual") falls through to an *interval* trigger whose
+       length is SyncIntervalMinutes, defaulting to 60 when it is 0 or negative. So
+       "Manual" alone still fired hourly. A huge interval is the only config-only way to
+       stop it. Run syncs by hand via scripts/sync-vod.sh. -->
+  <SyncIntervalMinutes>525600</SyncIntervalMinutes>
   <TriggerLibraryScan>true</TriggerLibraryScan>
-  <!-- Manual, not Daily: the scheduled sync trips the provider's abuse block (403s our
-       IPv4 and kills live TV). Run it via scripts/sync-vod.sh instead. -->
+  <!-- Manual: trips the provider's abuse block (403s our egress and kills live TV). -->
   <SyncScheduleType>Manual</SyncScheduleType>
   <SyncDailyHour>4</SyncDailyHour>
   <SyncDailyMinute>30</SyncDailyMinute>
