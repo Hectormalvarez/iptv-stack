@@ -38,7 +38,7 @@
   + `refresh_single_m3u_account` tasks → coverage 10% → **98%**, all three sources `success`, index
   rebuilt, profile M3U 1,677 channels, `/output/epg/Kodi` 35,315 programmes, proxy stream 19 MB/8 s;
   No-Guide sweep reapplied. Event labels were already current (0 changes)
-- **Repo**: 47 conventional commits, credentials kept out of git
+- **Repo**: 62 conventional commits, credentials kept out of git
 
 ## Pending ⚠️
 - **Confirm Jellyfin's guide repopulated.** It pulls Dispatcharr's XC `xmltv.php` and refreshes on
