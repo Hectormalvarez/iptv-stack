@@ -27,9 +27,26 @@
   outlived the documented ~15–45 min and escalated to live streams.
   The Xtream Library plugin with "all categories" selected trips the 403 block — keep the
   category selection tight and `RequestDelayMs` ≥ 250 until proven stable.
+- **The banned family flips — don't hard-code "IPv6 is the good one".** 2026-10-04: IPv4
+  answered normally (web root 401, live 302) while **IPv6** was 403'd — the reverse of
+  2026-10-01. A third-party egress (r.jina.ai) got `401` on the web root, proving the provider
+  was up and only *our* address was blocked. glibc sorts AAAA first, so a host-networked
+  container kept hitting the banned IPv6 and every stream died. Fix: mount
+  `config/gai.conf` (`precedence ::ffff:0:0/96 100`) into both containers so getaddrinfo
+  returns A records first. A restart picks the wrong family again unless the mount is present.
+  Quick check: `docker exec dispatcharr sh -lc 'getent ahosts cf.vovu.top'` — the IPv4 (A)
+  rows must come before the IPv6 (AAAA) rows.
 - **Jellyfin 10.11 plugin loading**: flat DLLs in `plugins/` are ignored; plugins need a
   `Name_version/` subfolder with the DLL + a `meta.json`. "Failed to load assembly ...
   incompatible version" = shared-library mismatch; try the next-oldest release.
+- **The Xtream-Library plugin cannot be switched off through its config.** Its
+  `GetDefaultTriggers()` *always* returns a trigger: `SyncScheduleType=Daily` gives a daily
+  one, and **every other value — including `Manual` — falls through to an interval trigger**
+  of `SyncIntervalMinutes` minutes, which **defaults to 60** when it is 0 or negative. So
+  setting `Manual` only removed the daily line while the sync kept firing **hourly**; each run
+  hammers `player_api.php` and re-trips the provider ban. The only config-only stop is a huge
+  interval (`SyncIntervalMinutes=525600`, 1 year). Diagnose via the `"Sync Xtream Library"
+  Completed ...` lines in the Jellyfin log and the `.snapshots/` mtimes. 2026-10-04.
 - **`hidden_from_output=True` beats profile membership.** A channel can be enabled in a
   profile and still never appear in that profile's M3U; the output builder filters hidden
   channels. The provider's PPV event slots ship hidden (2026-09-21 cleanup) — unhide them.

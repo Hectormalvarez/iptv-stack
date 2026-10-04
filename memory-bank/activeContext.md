@@ -1,4 +1,25 @@
-# Active Context (2026-10-01)
+# Active Context (2026-10-04)
+
+## 2026-10-04: provider banned IPv6 (family flipped) + hourly Xtream sync disabled
+- **Symptom:** Kodi couldn't play anything; the NFL slots showed the previous week's games.
+- **Root cause — two parts:**
+  1. The provider banned our **IPv6** (403 on `/`, `get.php`, `player_api`, `xmltv` and live)
+     while **IPv4 served normally** (web root 401, live URLs 302) — the *reverse* of 2026-10-01.
+     A third-party egress (r.jina.ai) got `401` on the web root, proving the provider was up and
+     only *our* address was blocked. glibc sorts AAAA first, so the host-networked containers
+     kept hitting the banned family and every stream died with `403 Forbidden`.
+  2. The Jellyfin **Xtream sync was running hourly.** The plugin's `GetDefaultTriggers()` always
+     returns a trigger — `Manual` falls through to an interval trigger of `SyncIntervalMinutes`,
+     which defaults to **60**. Every run hammered `player_api.php` and re-tripped the ban; it
+     also meant the playlist couldn't refresh, so the NFL fixture labels (read from
+     `Stream.name`) were days stale → "not this week's game".
+- **Fix:** mount `config/gai.conf` (`precedence ::ffff:0:0/96 100`) into dispatcharr + jellyfin
+  (`6ff9530`); set `SyncIntervalMinutes=525600` so the sync no longer fires (`3c82c59`).
+- **Verified:** NFL Network streamed 22 MB; Kodi opened the Commanders game (ch 5208, `NFL: 9:30am
+  Colts at Commanders`) with Dispatcharr showing it `active`; **0** 403s; no Xtream sync since the fix.
+- **Still open:** `get.php` was returning an odd Cloudflare `884` on IPv4, so the playlist hadn't
+  refreshed — once the IPv4 path stays clean, force an M3U refresh + re-run `label-event-slots.py`
+  to bring the fixtures current.
 
 ## Where things stand
 Live TV is working again after a ~2-day provider-egress outage (see below). Everything else is

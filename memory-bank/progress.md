@@ -27,9 +27,19 @@
   (`SyncScheduleType=Manual`), run on demand via `scripts/sync-vod.sh` (`3e60497`)
 - **Zapping fixed (2026-10-01)**: provider profile `max_streams` 2 → 3 — with 2 a single zap
   already filled the cap, so extra zaps 503'd
+- **IPv4-first provider egress (2026-10-04)**: the provider's ban flipped to IPv6 while IPv4
+  served normally; mounted `config/gai.conf` into both containers so glibc resolves IPv4 first
+  (`6ff9530`). Verified: NFL Network + the Commanders game stream, 0×403
+- **Xtream sync stopped firing hourly (2026-10-04)**: the plugin's `Manual` schedule type still
+  left an *interval* trigger, so it ran ~every 60 min and re-tripped the ban; set
+  `SyncIntervalMinutes=525600` (1 year) as the only config-only stop (`3c82c59`)
 - **Repo**: 47 conventional commits, credentials kept out of git
 
 ## Pending — the one operational step left ⚠️
+- **Refresh the provider fixtures once IPv4 `get.php` is clean.** The playlist hasn't refreshed
+  since ~2026-10-02 (the ban blocked it), so the NFL/event labels are stale. Force an M3U
+  refresh, then re-run `label-event-slots.py` (`LABEL_APPLY=1`) — the 09:00 cron also does it
+  daily from `Stream.name`.
 - **Re-run the No-Guide sweep.** It was deferred while the EPG harvest drained (the harvest is
   now finished). Dry run expects **889** channels → `No Guide`, with curated picks exempt
   (`Sports: WNBA` is now in `CURATED_GROUPS`, so the new event slots stay put).

@@ -203,12 +203,17 @@ consumed directly by a Jellyfin plugin instead.
 - **Live TV in the plugin is OFF** (`EnableLiveTv=false`) — live TV stays on the
   Dispatcharr M3U tuner.
 - **No scheduled sync — run it by hand.** The plugin's dropdown only offers `Interval`/`Daily`
-  (no "off"), but its config accepts **`SyncScheduleType=Manual`**, which makes it register
-  **no** trigger at startup — verified by the `Daily trigger for Sync Xtream Library ...` line
-  disappearing from the Jellyfin log. The config is
-  `jellyfin/config/plugins/configurations/Jellyfin.Xtream.Library.xml`.
+  (no "off") and `GetDefaultTriggers()` **always** returns a trigger: `Daily` gives a daily
+  one, and **every other value — including `Manual` — falls through to an *interval* trigger**
+  sized by `SyncIntervalMinutes`, which itself defaults to **60** when it is 0 or negative.
+  Setting `Manual` therefore only removed the *daily* line: the sync kept firing **hourly** and
+  re-tripped the provider block. There is no config value that disables it, so the config sets
+  **`SyncIntervalMinutes=525600` (1 year)** to make it effectively manual. (Corrected 2026-10-04
+  after the hourly `Sync Xtream Library` runs showed up in the Jellyfin log.) The config is
+  `jellyfin/config/plugins/configurations/Jellyfin.Xtream.Library.xml`, written by
+  `scripts/write-xtream-library-config.sh`.
   **Why manual:** the sync fires thousands of `player_api.php` calls and trips the provider's
-  abuse block, which 403s our IPv4 on every endpoint and takes live TV down with it (see
+  abuse block, which 403s our egress on every endpoint and takes live TV down with it (see
   *Provider egress*). Trigger a run with `scripts/sync-vod.sh` (or the plugin page's *Manual
   Sync* button); endpoint `POST /XtreamLibrary/Sync`, progress `/XtreamLibrary/Progress`.
 - **Category selection** (deliberately limited — not the full 28.7k catalog):
