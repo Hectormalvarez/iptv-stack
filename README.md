@@ -161,6 +161,30 @@ Gotchas worth knowing:
 - The provider stamps programmes with a `+0200` offset; Dispatcharr converts correctly (verified against
   CNN's real schedule) — do not add a timezone workaround.
 
+### When the guide drains: a stalled EPG refresh (2026-10-04)
+
+The provider's XMLTV feed is **short-horizon** — `xmltv.php` only carries ~11–14 h of programmes for the
+*mapped* channels — so the 6-hourly `epg_source-refresh-1` is the lifeline. If it fails (e.g. the egress
+403 during an address-family ban), no new programmes are inserted and the guide **ages out**: coverage
+collapsed 98% → 10% within a day while `ProgramData.max_end` stayed frozen at the last successful parse.
+The programmes are *not* wiped, so recovery is a refresh, not a restore:
+
+```bash
+# the same call the UI's EPG refresh icon / POST /api/epg/import/ makes
+docker exec dispatcharr python manage.py shell -c "
+from apps.epg.tasks import refresh_epg_data
+refresh_epg_data.delay(1, force=True)"      # id 1 = STRONG8K
+curl -s http://localhost:9191/output/epg/Kodi | grep -c '<programme '   # ~35k
+./scripts/verify-stack.sh                                               # coverage ≥95%
+```
+
+Verify with first-party signals only: `EPGSource.status == 'success'`, a future `ProgramData.max_end`, and
+`verify-stack.sh`. Note `/app/media` (where `cached_epg/<id>.xml` lives) is **ephemeral by design** — the
+official compose persists only `/data` and the image classifies `/app/media` as an `APP_DIRS` path — so a
+container recreate wipes the cache; it is rebuilt on the next successful refresh, and
+`build_programme_index` logging `File not found` until then is expected (not a volume to add). M3U accounts
+refresh the same way via `refresh_single_m3u_account.delay(<id>)`.
+
 ## Jellyfin Live TV hookup
 
 Use the **container names** over `media-net` (traffic stays internal). Jellyfin's Live TV is configured as:
