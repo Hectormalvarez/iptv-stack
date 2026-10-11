@@ -74,7 +74,35 @@
   refresh timer fire, or restart Kodi (needs SSH — see `progress.md`).
   Reading the blockage: RPC-thread methods answering + app-thread methods hanging = wedged player
   or a modal dialog, **not** a dead box and **not** a bad stream.
-- **A wedged Kodi re-triggers on the next PVR channel open** (2026-10-11, second freeze). After the
+- **A channel's feed is chosen by `ChannelStream.order` (0 = primary), and the provider's *naming*
+  lies about quality (2026-10-11).** RedZone (`#325`) shipped with three sources whose names suggested
+  the opposite of the truth:
+  `US: NFL REDZONE ᴴᴰ` = **1280x720 @ 29.97 fps**, `TV: … ᴿᴬᵂ` and `AT&T: … ῧᴬᵂ` = **1920x1080 @
+  59.94 fps**. Dispatcharr picks the lowest `order`, so the box was playing the 720p**30** feed and
+  the user reported it "laggy" — 30 fps on fast sport motion. **For live sport, fps beats resolution:
+  check with ffprobe (see below), never the name.** Fix is a data-level reorder of `ChannelStream.order`
+  (decision #9 style). Durability is good: `build-kodi-profile.py` never touches `ChannelStream`, and
+  `add-backup-streams.py` only *appends* links at the next free order — so a manual order survives both.
+- **Changing `order` does NOT affect a live session.** The source is resolved when the channel session
+  starts, and a client reconnect inside the **3 s grace window** reuses the old session
+  (`Cancelled pending shutdown … reconnected`). To force the new source: `Player.Stop`, wait ~10 s until
+  the log shows `Stopping channel <uuid>` + `Removed stream buffer`, then `Player.Open`. Confirm with
+  the `assigned stream <id>` line.
+- **A broken feed looks like "playing" on the box — check the proxy, not the player.** The promoted
+  `TV:` RAW feed threw `Reconnecting in 0.25 seconds... (attempt 1/3)` then
+  `ERROR … Packet corrupt (stream = 1, dts = …)`, and the result was a **black screen while Kodi
+  happily reported `speed: 1`, `Fullscreen video`, a live `time` counter and a 1080p resolution**.
+  So: player state `speed: 1` does **not** mean a picture is on screen. Grep the Dispatcharr log for
+  `Reconnect|corrupt|Stream process error` on that channel UUID first. Corollary — **RAW variants
+  (`ᴿᴬᵂ`) are not automatically better; they can be flat-out corrupt.** Order known-bad feeds last so
+  failover lands on a working one.
+- **Measure bitrate over ≥15 s, never 6 s** (2026-10-11): the provider bursts at connection start, so a
+  short sample is wildly inflated — the same 720p30 feed read **15 Mbps over 6 s but 4.8 Mbps over 15 s**,
+  and the *corrupt* `TV:` feed's 5.6 Mbps "lightest" reading was really a **stall** (1.75 Mbps). A low or
+  erratic reading is a health alarm, not a bargain. Useful live-stream ffprobe invocation (plain `-t`
+  is rejected): `-analyzeduration 3000000 -probesize 3000000 -select_streams v:0
+  -show_entries stream=codec_name,width,height,avg_frame_rate`. Direct provider URLs answer **302** —
+  curl needs `-L` and the pinned `TiviMate/5.1.6 (Android 12)` UA. After the
   first wedge cleared, the box answered `Player.GetActivePlayers` with `{"result":[]}` — proof the
   app thread was alive again — and then a single `Player.Open` on the new channel wedged it a second
   time. So "reads work" ≠ "the player works": test with a **known-good channel** before blaming the

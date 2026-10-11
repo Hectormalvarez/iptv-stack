@@ -48,6 +48,11 @@
   greps `/storage/.kodi/temp/kodi.log`.
 - **Do not use the `pvr.iptvsimple` addon toggle to force a playlist reload** — it wedges the player
   (see `systemPatterns.md`). Wait for the 10-min refresh timer instead.
+- **Audit the *primary* source (order 0) of the sports/event channels.** RedZone proved the trap:
+  Dispatcharr defaults to whatever was linked first, which was the 720p**30** `ᴴᴰ` variant while
+  1080p**60** `ᴿᴬᵂ` variants sat unused — and one RAW variant was outright corrupt. A one-pass script
+  could ffprobe each channel's order-0 feed and report fps/corruption, the way `add-backup-streams.py`
+  reports missing backups.
 - **Confirm #410 survives the next `build-kodi-profile.py` run** — it should (adopted via its `News`
   group membership), but it is the first channel added by hand rather than by the script.
 - **Confirm Jellyfin's guide repopulated.** It pulls Dispatcharr's XC `xmltv.php` and refreshes on

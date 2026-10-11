@@ -28,6 +28,15 @@
   the two freezes were **stale IPTV Simple/PVR state from the mid-session addon toggle**, and only a
   reboot cleared it. PVR id stayed **5215** across the restart here, but resolve it fresh rather than
   assuming.
+- **Then: RedZone was "laggy" → fixed by reordering its sources (same session).** `#325`'s primary
+  (`US: NFL REDZONE ᴴᴰ`) was a **720p29.97** feed while `TV:`/`AT&T:` `ᴿᴬᵂ` are **1080p59.94** — the
+  "HD" name was the worst of the three. Promoted `TV:` first, which turned out to be **corrupt**
+  (`Packet corrupt`, reconnect attempts) and gave a *black screen while Kodi reported `speed: 1`,
+  fullscreen video and 1080p* — my mistake; the burst-inflated 6 s bitrate sample I chose it on was
+  misleading. Settled on **`AT&T:` (1080p59.94, ~9 Mbps steady)** with `US:` (720p30, ~4.8 Mbps) as the
+  first fallback and the corrupt `TV:` last. Verified: box reports `VideoResolution 1080`,
+  `speed: 1`, `Live: NFL RedZone`, no errors on the new session, 0×403.
+
 - **Second freeze (same session):** the box un-wedged on its own (it answered
   `Player.GetActivePlayers` → `{"result":[]}`, so the app thread was alive), `Player.Open` on 5215 was
   issued, the proxy logged the box connecting and dropping twice within ~2 s, and the app thread
@@ -36,8 +45,7 @@
   in the same pass — the entry the box receives for `#410` is identical in shape to the working `#352`
   entry (fetched with the box's own Host, zero `localhost` URLs), catchup is off on channel and
   streams (`is_catchup=False`, and the profile M3U has no `catchup` attributes at all), and the feed
-  streams at ~10 Mbps. **Next attempt should start by playing a known-good channel** to prove the PVR
-  path is healthy on the fresh boot before touching 410.
+  streams at ~10 Mbps. (The clean-boot retry did work — see the RESOLVED bullet above.)
 
 ## 2026-10-11: "put the game on" — live TV switched via JSON-RPC (operational, no code change)
 - **Request:** put on the early-window NFL game. It is provider slot **#352**
