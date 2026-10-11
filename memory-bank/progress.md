@@ -42,6 +42,13 @@
   it went stale on every docs commit, and the last one existed only to bump it)
 
 ## Pending ⚠️
+- **Kodi box needs a power cycle (2026-10-11)** — it is wedge-locked: Kodi's app/player thread is
+  hung, so `System.Reboot` is accepted but never runs and SSH auth is refused. Power-cycle it at
+  the box, then re-resolve the PVR id for **#410 NBC 5 Chicago (WMAQ)** and zap to it.
+- **Install an SSH key on the box — now the top priority.** Remote recovery is impossible without
+  it, and so is every README workflow that greps `/storage/.kodi/temp/kodi.log`.
+- **Do not use the `pvr.iptvsimple` addon toggle to force a playlist reload** — it wedges the player
+  (see `systemPatterns.md`). Wait for the 10-min refresh timer instead.
 - **Confirm Jellyfin's guide repopulated.** It pulls Dispatcharr's XC `xmltv.php` and refreshes on
   its own schedule; the admin password is held by the user, so this was not forced. Check Live TV →
   guide next session.
