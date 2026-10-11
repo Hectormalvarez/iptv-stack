@@ -61,6 +61,19 @@
   so nothing can force an IPTV Simple playlist reload from outside (Kodi 21 has no JSON-RPC
   method for it). If JSON-RPC stops answering, scan the subnet before assuming the box is up
   — the last outage was the box being off, not the stack.
+- **⚠️ Do NOT `Addons.SetAddonEnabled` on `pvr.iptvsimple` to force a playlist reload (2026-10-11).**
+  It *does* reload the playlist — the new channel appeared (1,677 → 1,678) within seconds — but it
+  also tears down whatever is playing and leaves Kodi's **player/app thread wedged**. Symptom
+  pattern: `Player.Open` never returns (no body, curl exit 28), a random client connects to the
+  proxy and drops within ~2–5 s, the on-screen player stays idle, and then *every* `Player.*` /
+  `GUI.GetProperties` call blocks **while `JSONRPC.Ping`, `Input.ExecuteAction` and `System.Reboot`
+  still answer `OK`** (they run on the RPC thread, not the app thread). `System.Reboot` is accepted
+  and then never executed, because the shutdown is actioned by the stuck app thread — the box stays
+  up and wedged. There is no remote recovery: with SSH auth refused, only a **power cycle at the
+  box** clears it. Reload the playlist the supported ways instead: let the 10-min IPTV Simple
+  refresh timer fire, or restart Kodi (needs SSH — see `progress.md`).
+  Reading the blockage: RPC-thread methods answering + app-thread methods hanging = wedged player
+  or a modal dialog, **not** a dead box and **not** a bad stream.
 - **`max_streams` is Dispatcharr's own cap**, not the provider's. 1 caused 503s on every zap
   (→ 2 on 2026-09-21). Raised to **3** on 2026-10-01: with 2 a single zap already holds
   old+new, so there is **zero headroom** and any lingering/failed init — or Jellyfin's tuner

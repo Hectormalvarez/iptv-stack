@@ -1,5 +1,29 @@
 # Active Context (2026-10-11)
 
+## 2026-10-11 (later): NBC 5 Chicago added for the marathon — box left WEDGED, needs a power cycle
+- **Request:** switch to the Chicago Marathon on the NBC Chicago channel, "not listed in the guide".
+- **Why it was missing:** the WMAQ feed was never a profile member. The right channel is
+  **#1923 `US: NBC 5 CHICAGO IL (WMAQ) HD`** (channel id 4404), bound to EPG
+  `EPGSHARE-US-LOCALS/WMAQ-DT`, whose current programme is literally *2026 Bank of America Chicago
+  Marathon* (12:00–16:00 **UTC** = 07:00–11:00 CDT — note `timezone.localtime()` in the container
+  prints **UTC**, so subtract 5 h for Austin). The three other WMAQ rows (`#5004`/`#5005`/`#5006`
+  A/H/S and `#5376` D) are RAW feeds on the same EPG.
+- **Done (durable):** moved it into the **`News` group at #410** with `ChannelOverride.name =
+  'NBC 5 Chicago (WMAQ)'` and enabled the Kodi membership — the builder *adopts* anything already
+  in a `KODI_GROUPS` group, so a future `build-kodi-profile.py` run keeps it (no script edit
+  needed). Attached `#5005`'s stream as an order=1 failover: the feed was single-stream, which is
+  the documented hourly-reset death. Profile M3U 1,677 → **1,678**; `verify-stack.sh` healthy,
+  EPG coverage 98%. Both feeds verified through the proxy (primary ~10 Mbps, failover ~15 Mbps,
+  h264 720p30 + AAC-LC — nothing exotic).
+- **How it went wrong:** to make the box see #410 I toggled `pvr.iptvsimple` off/on (the only
+  remote way to force a playlist reload). The box picked the channel up (1,678 channels, PVRID
+  5215) but the toggle killed the running NFL stream **and wedged Kodi's app thread** — see
+  `systemPatterns.md` for the full symptom pattern. The marathon never started, and the box can no
+  longer be driven: `System.Reboot` is accepted but not executed, SSH auth is refused, so **only a
+  power cycle at the box recovers it**.
+- **Left to do after the power cycle:** re-resolve the PVR id for channel 410 (it can change across
+  a restart — do not assume 5215) and `Player.Open` it. `#352` (the Eagles game) is still there.
+
 ## 2026-10-11: "put the game on" — live TV switched via JSON-RPC (operational, no code change)
 - **Request:** put on the early-window NFL game. It is provider slot **#352**
   `NFL: 9:30am Eagles at Jaguars` (`group-title="Sports: NFL"`), kickoff 09:30 ET = 08:30 CDT,
