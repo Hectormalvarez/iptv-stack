@@ -101,6 +101,19 @@
 - **jellyfin-kodi 2.x does NOT do Live TV.** Live TV always goes IPTV Simple → Dispatcharr;
   Jellyfin handles libraries/recordings. That is the intended architecture, not a workaround.
 - Kodi Sync Queue needs matching ABI versions on server and client.
+- **JSON-RPC needs `-u kodi:kodi` on every call** (`http://192.168.1.181:8080/jsonrpc`).
+  Unauthenticated it answers `401 Unauthorized` with a **zero-length body** — indistinguishable
+  from an unreachable host, and it reads like "the box is off" (2026-10-11 detour). Related traps:
+  - `PVR.GetChannels` only accepts real `Item.Fields.Base` properties; `label` / `channelname`
+    are rejected with `Invalid params`. Omit `properties` and you get `channelid` + `label`.
+  - Group ids come from `PVR.GetChannelGroups` — `"alltv"` works, and `Sports: NFL` is **77**
+    (as an integer).
+  - **PVR `channelid` ≠ channel number** (the NFL slate is 5194–5213); resolve it before
+    `Player.Open`, which takes `{"item":{"channelid":<int>}}`.
+  - The box's DHCP address drifts — `k5320.lan` is the stable handle. `ul5420` (`192.168.1.107`
+    / `.142`) also listens on 8080, so a port scan alone will point you at the wrong machine.
+  - Play the real feed, not a restart: check `Player.GetProperties` — the position must resume
+    at the live edge (35m56s for a game that kicked off 36 min ago), not at 0.
 
 ## Curation model
 `build-kodi-profile.py` is the single source of truth for the client lineup:

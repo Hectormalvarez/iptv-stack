@@ -1,4 +1,24 @@
-# Active Context (2026-10-04)
+# Active Context (2026-10-11)
+
+## 2026-10-11: "put the game on" — live TV switched via JSON-RPC (operational, no code change)
+- **Request:** put on the early-window NFL game. It is provider slot **#352**
+  `NFL: 9:30am Eagles at Jaguars` (`group-title="Sports: NFL"`), kickoff 09:30 ET = 08:30 CDT,
+  still on the provider's slate. Guide/EPG healthy throughout (`verify-stack.sh` → healthy,
+  98% coverage, 1,677 profile channels).
+- **Played:** `Player.Open {"item":{"channelid":5198}}` → `speed: 1`, position **35m56s → 36m28s**
+  (resumed at the live edge, so it is the real feed, not a restart). Dispatcharr logged
+  `Channel 74f8bce5-… has 1 clients, state: active`, **0×403** over 5 min, and the previous
+  channel (ESPN HD pregame, `5cd98c12-…`) released its slot cleanly. Proxy stream pre-checked
+  at 11.2 MB / 12 s (~7.5 Mbps) before switching.
+- **PVR `channelid` ≠ channel number.** The scripted NFL slate is `channelid` 5194–5213
+  (5198 = 352 Eagles, 5208 = 360 Giants@Commanders, 5152 = 325 RedZone, 1791 = 321 NFL Network).
+  Resolve ids with `PVR.GetChannelGroups` → `Sports: NFL` = **77**, then
+  `PVR.GetChannels {"channelgroupid":77}` (omit `properties` to get `channelid`+`label`).
+- **Box state:** back at **192.168.1.181** (`k5320.lan`); **port 22 is now open** but rejects key
+  *and* password auth from `usrv-01`, so JSON-RPC on 8080 is still the only way in.
+- **Lesson (now in systemPatterns):** an unauthenticated `/jsonrpc` POST answers `401` with an
+  **empty body**, which reads exactly like a dead host. And `192.168.1.107`/`.142` also listens
+  on 8080 but is a different machine (`ul5420`) — a port scan is not a box check.
 
 ## 2026-10-04 (later): guide restored — STRONG8K EPG refreshed + No-Guide sweep reapplied
 - **Symptom:** `verify-stack.sh` FAILed — EPG coverage **10%** (692/777 blank), `STRONG8K` source
