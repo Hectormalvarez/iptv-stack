@@ -82,8 +82,10 @@
   `catchup_days=0`, and the profile M3U contains **zero** `catchup` attributes), a malformed playlist
   entry (fetched with the *box's* Host so the URLs match what it really sees — byte-for-byte the same
   shape as the working 352 entry, no `localhost` URLs), and the stream itself (healthy through the
-  proxy at ~10 Mbps, h264 720p30 + AAC-LC). The working hypothesis is stale IPTV Simple/PVR state
-  left by the mid-session addon toggle, which only a clean restart clears.
+  proxy at ~10 Mbps, h264 720p30 + AAC-LC). **Confirmed 2026-10-11:** after a clean power cycle the
+  very same channel opened first try and played, so the wedge is stale IPTV Simple/PVR state from the
+  mid-session toggle — *not* the channel and *not* the stream. Bottom line: never toggle the addon to
+  force a reload; if a wedge happens, the only fix is a restart at the box.
 - **`max_streams` is Dispatcharr's own cap**, not the provider's. 1 caused 503s on every zap
   (→ 2 on 2026-09-21). Raised to **3** on 2026-10-01: with 2 a single zap already holds
   old+new, so there is **zero headroom** and any lingering/failed init — or Jellyfin's tuner

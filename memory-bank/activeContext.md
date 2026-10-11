@@ -1,6 +1,6 @@
 # Active Context (2026-10-11)
 
-## 2026-10-11 (later): NBC 5 Chicago added for the marathon — box left WEDGED, needs a power cycle
+## 2026-10-11 (later): NBC 5 Chicago added for the marathon — ON AIR (fixed by a power cycle)
 - **Request:** switch to the Chicago Marathon on the NBC Chicago channel, "not listed in the guide".
 - **Why it was missing:** the WMAQ feed was never a profile member. The right channel is
   **#1923 `US: NBC 5 CHICAGO IL (WMAQ) HD`** (channel id 4404), bound to EPG
@@ -21,8 +21,13 @@
   `systemPatterns.md` for the full symptom pattern. The marathon never started, and the box can no
   longer be driven: `System.Reboot` is accepted but not executed, SSH auth is refused, so **only a
   power cycle at the box recovers it**.
-- **Left to do after the power cycle:** re-resolve the PVR id for channel 410 (it can change across
-  a restart — do not assume 5215) and `Player.Open` it. `#352` (the Eagles game) is still there.
+- **RESOLVED by a power cycle:** with a clean boot, `Player.Open` on channel 410 returned `OK` on the
+  first try and the marathon played — `label "NBC 5 Chicago (WMAQ)"`, title *2026 Bank of America
+  Chicago Marathon*, `speed: 1`, position **2h32m** of the 4 h broadcast (the live edge), Dispatcharr
+  showing 1 client `state: active`, 0×403. So the channel, the M3U entry and the feed were all fine;
+  the two freezes were **stale IPTV Simple/PVR state from the mid-session addon toggle**, and only a
+  reboot cleared it. PVR id stayed **5215** across the restart here, but resolve it fresh rather than
+  assuming.
 - **Second freeze (same session):** the box un-wedged on its own (it answered
   `Player.GetActivePlayers` → `{"result":[]}`, so the app thread was alive), `Player.Open` on 5215 was
   issued, the proxy logged the box connecting and dropping twice within ~2 s, and the app thread
