@@ -7,7 +7,8 @@ IPTV → Jellyfin media server.
 | Dispatcharr | http://localhost:9191 | M3U/EPG management, stream proxying, DVR |
 | Jellyfin | http://localhost:8096 | Media server & clients |
 
-Both share the `media-net` Docker network and an Intel Iris Xe GPU (VAAPI) at `/dev/dri`.
+Both run with `network_mode: host` (see *Provider egress*) and share an Intel Iris Xe GPU (VAAPI)
+at `/dev/dri`. Only `watchstate` still sits on the `media-net` bridge.
 
 ## Provider (strong8k)
 
