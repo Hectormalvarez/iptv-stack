@@ -23,6 +23,16 @@
   power cycle at the box recovers it**.
 - **Left to do after the power cycle:** re-resolve the PVR id for channel 410 (it can change across
   a restart — do not assume 5215) and `Player.Open` it. `#352` (the Eagles game) is still there.
+- **Second freeze (same session):** the box un-wedged on its own (it answered
+  `Player.GetActivePlayers` → `{"result":[]}`, so the app thread was alive), `Player.Open` on 5215 was
+  issued, the proxy logged the box connecting and dropping twice within ~2 s, and the app thread
+  wedged again — all `Player.*` / `GUI.*` calls now hang while `JSONRPC.Ping` still answers. Verdict:
+  a PVR channel open re-triggers the wedge, and only a power cycle clears it. Server side was cleared
+  in the same pass — the entry the box receives for `#410` is identical in shape to the working `#352`
+  entry (fetched with the box's own Host, zero `localhost` URLs), catchup is off on channel and
+  streams (`is_catchup=False`, and the profile M3U has no `catchup` attributes at all), and the feed
+  streams at ~10 Mbps. **Next attempt should start by playing a known-good channel** to prove the PVR
+  path is healthy on the fresh boot before touching 410.
 
 ## 2026-10-11: "put the game on" — live TV switched via JSON-RPC (operational, no code change)
 - **Request:** put on the early-window NFL game. It is provider slot **#352**

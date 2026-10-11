@@ -74,6 +74,16 @@
   refresh timer fire, or restart Kodi (needs SSH — see `progress.md`).
   Reading the blockage: RPC-thread methods answering + app-thread methods hanging = wedged player
   or a modal dialog, **not** a dead box and **not** a bad stream.
+- **A wedged Kodi re-triggers on the next PVR channel open** (2026-10-11, second freeze). After the
+  first wedge cleared, the box answered `Player.GetActivePlayers` with `{"result":[]}` — proof the
+  app thread was alive again — and then a single `Player.Open` on the new channel wedged it a second
+  time. So "reads work" ≠ "the player works": test with a **known-good channel** before blaming the
+  new one. Ruled out for the new channel (410, WMAQ): catchup/timeshift (`is_catchup=False`,
+  `catchup_days=0`, and the profile M3U contains **zero** `catchup` attributes), a malformed playlist
+  entry (fetched with the *box's* Host so the URLs match what it really sees — byte-for-byte the same
+  shape as the working 352 entry, no `localhost` URLs), and the stream itself (healthy through the
+  proxy at ~10 Mbps, h264 720p30 + AAC-LC). The working hypothesis is stale IPTV Simple/PVR state
+  left by the mid-session addon toggle, which only a clean restart clears.
 - **`max_streams` is Dispatcharr's own cap**, not the provider's. 1 caused 503s on every zap
   (→ 2 on 2026-09-21). Raised to **3** on 2026-10-01: with 2 a single zap already holds
   old+new, so there is **zero headroom** and any lingering/failed init — or Jellyfin's tuner
