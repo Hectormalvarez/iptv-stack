@@ -54,9 +54,12 @@
   with 1,677 channels / 23 groups including `Sports: WNBA`. It streams again after the
   2026-10-01 networking fix (verified playing ch 1581). Earlier it had been offline (no ARP,
   full /24 scan clean) — the WNBA channels were in the profile M3U but unloaded at the time.
-- **Kodi box has no SSH** (port 22 unreachable) — only JSON-RPC on 8080. Forcing a playlist
-  reload from outside is therefore impossible; a reboot/restart on the box (or the 10-min
-  timer) is the only way. Worth enabling SSH in LibreELEC settings.
+- **Kodi box SSH is listening but unusable** (inaccurate note fixed 2026-10-11): port 22 is now
+  **open**, but `root@192.168.1.181` rejects both key and password auth from `usrv-01`, so
+  JSON-RPC on 8080 (`-u kodi:kodi`) is still the only channel in. Forcing a playlist reload from
+  outside remains impossible; a restart on the box (or the 10-min timer) is the only way. Still
+  worth installing an SSH key from LibreELEC settings — that would also make the README's
+  log-based checks (`/storage/.kodi/temp/kodi.log`) usable from here.
 - **Kodi client IP drifts** (DHCP). If JSON-RPC stops answering, scan for the box rather than
   assuming it is down.
 - Confirm whether the client's IPTV Simple refresh interval is really 10 min: README's
