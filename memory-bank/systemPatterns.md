@@ -86,6 +86,10 @@
   very same channel opened first try and played, so the wedge is stale IPTV Simple/PVR state from the
   mid-session toggle — *not* the channel and *not* the stream. Bottom line: never toggle the addon to
   force a reload; if a wedge happens, the only fix is a restart at the box.
+  **Ordinary channel switching is unaffected** — after the clean boot a plain
+  `Player.Open` to `#410` and then to `#325` (RedZone) both returned `OK` immediately and the
+  previous channel was torn down normally (`Marked channel <uuid> stopping`). So do not avoid
+  `Player.Open` out of caution: it is only the addon toggle that breaks the box.
 - **`max_streams` is Dispatcharr's own cap**, not the provider's. 1 caused 503s on every zap
   (→ 2 on 2026-09-21). Raised to **3** on 2026-10-01: with 2 a single zap already holds
   old+new, so there is **zero headroom** and any lingering/failed init — or Jellyfin's tuner
