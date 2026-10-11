@@ -901,6 +901,18 @@ ssh root@192.168.1.181 'dmesg | grep -ci segfault; grep -cE ERROR /storage/.kodi
 ssh root@192.168.1.181 'grep -oE "Live Stream URL: [^ ]*" /storage/.kodi/temp/kodi.log | tail -1'
 ```
 
+Three things trip you up when driving the box from a script:
+
+- **Always send the credentials** (`-u kodi:kodi`). Without them every call returns `401` with a
+  **zero-length body**, which is indistinguishable from an unreachable host.
+- `PVR.GetChannels` only accepts real `Item.Fields.Base` properties — `label` and `channelname`
+  are rejected with `Invalid params`. Omit `properties` and you get `channelid` + `label`; group
+  ids come from `PVR.GetChannelGroups` (`"alltv"` works, `Sports: NFL` = `77`).
+- **`channelid` is Kodi's own id, not the channel number** — the NFL slate is 5194–5213, so
+  `#352` (`NFL: 9:30am Eagles at Jaguars`) is `5198`. Resolve it before `Player.Open`, then
+  confirm the switch took: `Player.GetProperties` must show the position resume **at the live
+  edge** (e.g. 35m56s for a game that kicked off 36 min ago), not at 0.
+
 Edit addon settings in `userdata/addon_data/pvr.iptvsimple/instance-settings-1.xml`, then
 `systemctl stop kodi; <edit>; systemctl start kodi` — stop Kodi first, otherwise it rewrites the
 file on exit.
