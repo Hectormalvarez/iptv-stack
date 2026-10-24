@@ -145,6 +145,23 @@
   account with **no URL** stays `error` forever — an orphan worth deleting.
 - **Output M3U/EPG cache TTL is 2 s**, so changes appear immediately on re-fetch.
 - Profile-scoped endpoints: `/output/m3u/<ProfileName>`, `/output/epg/<ProfileName>`.
+- **"Which game is on?" is answered by `ProgramData.description`, never by `title`.** The provider
+  titles every national sports feed generically (`Live: College Football`, `NFL Football`) while the
+  actual fixture sits in the description (*"The No. 7 Ole Miss Rebels visit the No. 19 Texas
+  Longhorns for an SEC game"*). Enumerate a slate with
+  `ProgramData.objects.filter(start_time__lte=now, end_time__gte=now, description__icontains=...)`
+  and map it back through `ProgramData.epg_id` → `Channel.effective_epg_data_obj` (the join field is
+  `epg`, not `epg_data`). A `title`-based search returns dozens of rows that all read the same and
+  tells you nothing.
+- **`US| NCAAF PPV`-style slot groups are stale on the *channel* name and current on the *stream*
+  name.** The 82 slots all ship `hidden_from_output=True`, so none are ever in the Kodi profile, and
+  `Channel.name` holds a *previous* week's fixture while `ChannelStream.stream.name` holds the
+  current one — #7956's channel name says "UT Rio Grande Valley at UTSA" but its stream says
+  "2pm Colgate at Richmond". `label-event-slots.py` only rewrites profile members, which is exactly
+  why the two drift apart. Never quote a game from that group's channel name.
+- **The container reports UTC, not America/Chicago**, from `timezone.get_current_timezone()`, even
+  though `TZ=America/Chicago` is set in compose. Subtract 5 h for Austin before quoting a kickoff —
+  a "23:30" programme is 18:30 CDT, and guessing the other way puts you 5 h out.
 
 ## Kodi 21 (Omega) gotchas
 - `inputstream.ffmpegdirect` **timeshift** and IPTV Simple **catchup** are known crash bugs
