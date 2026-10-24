@@ -43,6 +43,12 @@
 
 ## Pending ⚠️
 - _(done 2026-10-11)_ box power-cycled; **#410 NBC 5 Chicago (WMAQ) is playing the Chicago Marathon**.
+- **#104 ABC 13 (KTRK Houston) is single-source.** It carried Ole Miss at Texas on 2026-10-24 and is
+  the only usable ABC feed in the profile, so any ABC game still dies at the provider's hourly reset
+  (`add-backup-streams.py` hardened 475 channels but not this one). Duplicate candidates spotted:
+  `VIP: ABC AEREO (MEXICALI / TIJUANA / CIUDAD JUAREZ)`, currently parked in the `No Guide` group.
+- **The box is on `192.168.1.182` now** (`k5320.lan`; `.181` is dead). The DHCP drift is routine
+  rather than an incident — resolve the hostname first, every session.
 - **Install an SSH key on the box — now the top priority.** Remote recovery is impossible without
   it (this session needed a power cycle at the box, twice), and so is every README workflow that
   greps `/storage/.kodi/temp/kodi.log`.
