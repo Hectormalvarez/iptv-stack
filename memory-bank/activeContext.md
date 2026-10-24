@@ -1,4 +1,26 @@
-# Active Context (2026-10-11)
+# Active Context (2026-10-24)
+
+## 2026-10-24 (Sat evening): Ole Miss at Texas pulled up on ABC — plain zap, no wedge
+- **Request:** "pull up the college football game" — the game is **not identifiable from the guide**.
+- **Box IP drifted again: `k5320.lan` = `192.168.1.182`** (`.181` answers nothing; same Kodi, same
+  `-u kodi:kodi`). Resolve the name every session instead of reusing a remembered number.
+- **Why the guide cannot answer "which game":** the provider's EPG titles every national feed
+  **"Live: College Football"**; the fixture is only in the programme **description**
+  (#104: *"The No. 7 Ole Miss Rebels visit the No. 19 Texas Longhorns for an SEC game"*).
+  So enumerate the slate from `ProgramData.description`, not `title` — see `systemPatterns.md`.
+- **The provider's `US| NCAAF PPV` group (82 slots) is a decoy.** All ship
+  `hidden_from_output=True`, so none are in the Kodi profile, and their **channel names are stale**
+  (a previous week's fixtures) while their **stream names are current** — #7956's name reads
+  "UT Rio Grande Valley at UTSA" but its stream reads "2pm Colgate at Richmond". Trust neither
+  without cross-checking.
+- **Done:** resolved **pvrid 2048** = `US: ABC 13 (KTRK) HOUSTON HD` (profile **#104**,
+  `Austin Local`; `channelid` ≠ channel number), then `Player.Open` → `OK` on the first try while
+  the box was already streaming ESPN (#301).
+- **Verified:** `Player.GetItem` → correct label; `Player.GetProperties` → `live: true`, `speed: 1`,
+  h264 1280×720 (ABC is 720p60 natively — not a degraded feed); Dispatcharr
+  `Channel 5ebe13bf-… has 1 clients, state: active` (UUID confirmed = #104), **0×403**; the old ESPN
+  session (`5cd98c12-…`) tore down cleanly, so **a plain zap still does not wedge the box**.
+- **Watch:** #104 is **single-source** — exactly the hourly-reset death pattern. No failover attached.
 
 ## 2026-10-11 (later): NBC 5 Chicago added for the marathon — ON AIR (fixed by a power cycle)
 - **Request:** switch to the Chicago Marathon on the NBC Chicago channel, "not listed in the guide".
