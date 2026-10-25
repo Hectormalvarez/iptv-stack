@@ -1,5 +1,35 @@
 # Active Context (2026-10-25)
 
+## 2026-10-25 (Sun 17:50 CDT): second subscription wired in as cross-provider failover
+- **Request:** "i'm buying a sub to a new service" → "do it".
+- **New service — ZQAVO, Dispatcharr M3U account id 3:** `line.zqavo.top`,
+  `auth: 1 / status: Active`, **`max_connections: 1`**, panel timezone **Africa/Casablanca**,
+  **33,614 live streams in 725 categories**. `player_api.php` works but **`get.php` and `xmltv.php`
+  both return 502** — fine for our purpose, because Dispatcharr imports XC accounts through the API
+  and a failover source does not need its own EPG (the channel keeps its existing binding). This
+  matches the README's own note that `get.php` returns nothing to plain curl.
+- **Imported narrowly on purpose:** 13 `|US|` categories → **1,529 streams**, not all 725
+  categories, per the API-abuse-block lesson. Gotcha found: the import only creates streams for
+  **enabled** groups. With `auto_enable_new_groups_live=False` the first refresh returned
+  `error: No streams returned from Xtream Codes provider` with 0 streams; 726
+  `ChannelGroupM3UAccount` rows exist and **all default to disabled** — enabling the 13 and
+  refreshing again imported everything in 5.7 s.
+- **Failover wired:** `scripts/add-cross-provider-failover.py` (dry-run by default,
+  `FAILOVER_APPLY=1`) attaches the new provider's feed at the **highest** `ChannelStream.order` on
+  **22 channels** — the Austin locals (it even carries `|US| ABC 24 (KVUE) Austin`, the *real*
+  Austin ABC that the old provider never had), ESPN/ESPN2/ESPN News/ESPN USA/CBSSN/FS1/FS2,
+  NFL Network ×4, RedZone, SEC/ACC/BTN, and the `NCAAF 03/09/10` network feeds. Verified idempotent
+  (second run: "to attach: 0").
+- **Audit closed — the pending `order=1` fixture mismatch:** found and **removed 4 wrong-fixture
+  links**. `NFL  | 4k - SNF 8:20pm Chiefs at Seahawks` was the `order=1` "backup" on **#321, #1680,
+  #1681, #2251** (all NFL Network), so a failover would have silently shown a *different game*.
+  Those channels then got the new provider's **correct** NFL Network feed, so none were left
+  single-source. Re-audit: **0 remaining**. Four NBA candidates (#341/#342/#2201/#2202) were
+  **false positives** — both sources carry the *identical* fixture name, so the duplicate is
+  legitimate. One left for review: **#324 NHL Network's `order=1` is the empty slot `NHL  |  4K -`**.
+- **Consequence to remember:** `max_connections: 1` means ZQAVO can never serve two channels at
+  once, so it must stay failover-only. #325 carries it at `order=3` (deepest), which is correct.
+
 ## 2026-10-25 (Sun 16:47 CDT): "not playing" triage — provider outage, not the stack
 - **Symptom:** the TV showed nothing. `Player.GetActivePlayers` → `[]` (idle) while `JSONRPC.Ping` →
   `pong`, so the box was **not wedged** — it just had nothing playing.

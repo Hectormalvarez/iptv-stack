@@ -43,12 +43,15 @@
 
 ## Pending ⚠️
 - _(done 2026-10-11)_ box power-cycled; **#410 NBC 5 Chicago (WMAQ) is playing the Chicago Marathon**.
-- **Audit `order=1` sources whose fixture differs from `order=0`.** `#321` and `#2251` both fail over
-  to `NFL  | 4k - SNF 8:20pm Chiefs at Seahawks` — a *different game* — because
-  `add-backup-streams.py` matched on the network name, not the fixture. A failover rotation would
-  silently show the wrong match. Likely affects other network channels that also have per-fixture
-  slot feeds, so the audit should compare every `ChannelStream(order=1).stream.name` against
-  `order=0`, not just count sources.
+- _(done 2026-10-25)_ **`order=1` fixture-mismatch audit complete.** 4 wrong-game links removed —
+  #321/#1680/#1681/#2251 (all NFL Network) were falling over to `NFL  | 4k - SNF 8:20pm Chiefs at
+  Seahawks`, a *different* broadcast — and those channels were then re-pointed at the second
+  subscription's correct NFL Network feed, so none are single-source. Re-audit: **0 remaining**.
+  Left for review: **#324 NHL Network's `order=1` is the empty slot `NHL  |  4K -`**.
+- **The new subscription (ZQAVO) has `get.php` and `xmltv.php` returning 502** — `player_api.php`
+  works, which is all the import needs. Harmless while it is failover-only, but promoting it to a
+  primary would need a working EPG path, and `max_connections: 1` means it can never serve two
+  channels at once.
 - **#104 ABC 13 (KTRK Houston) is single-source.** It carried Ole Miss at Texas on 2026-10-24 and is
   the only usable ABC feed in the profile, so any ABC game still dies at the provider's hourly reset
   (`add-backup-streams.py` hardened 475 channels but not this one). Duplicate candidates spotted:
