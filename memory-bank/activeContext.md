@@ -1,5 +1,31 @@
 # Active Context (2026-10-25)
 
+## 2026-10-25 (Sun 16:47 CDT): "not playing" triage — provider outage, not the stack
+- **Symptom:** the TV showed nothing. `Player.GetActivePlayers` → `[]` (idle) while `JSONRPC.Ping` →
+  `pong`, so the box was **not wedged** — it just had nothing playing.
+- **Two causes, in sequence:**
+  1. **Expected:** the #352 slot feed ended at **12:06 CDT** (the game finished ~11:30). The stream
+     manager logged `Stream was stable for 8935s` and then stopped. `autoplaynextprogramme=false`, so
+     Kodi stopped rather than retuning — nothing played from 12:06 onward.
+  2. **The actual fault:** when the box was next tuned to **RedZone (#325)** the stream never came up.
+     Logs show the TV (`Broken pipe … (192.168.1.182)`) looping on dropped connections while
+     Dispatcharr held the channel at `state: connecting`.
+- **Verdict: provider-side outage.** **20× 502 in one hour** (after 1/4/2/1 per hour for the previous
+  four), 58× `Invalid data found when processing input`, 57× `waiting for buffer to fill: 0/4 chunks`,
+  and **every** channel stuck in `connecting` — KXAN #101, ESPN #301, RedZone #325, NFL slots
+  #358/#361. Direct probes of a single stream URL returned **407 / 502 / timeout /
+  200-with-53-bytes-of-HTML**, and `player_api.php` answered
+  `{"error":"There is an Database Error","status":false}`.
+- **Ruled out:** a wedge (ping answers), an IP ban (web root **401 on both families** — a ban is 403),
+  the address-family flip (`getent ahosts` still A-first), the stack (`verify-stack.sh` healthy,
+  EPG 97%, all three EPG sources `success`), and the channel/fixture/failover set (unrelated channels
+  fail identically, so the diagnosis never needed to touch Dispatcharr's config).
+- **Disclosure:** 3 of the 4 channels in `connecting` were **my own diagnostic probes** (KXAN, ESPN,
+  #361); they cleared as those client connections timed out. They did not cause the outage (onset was
+  ~17:00 UTC, before the probes) but with a 3-connection cap they briefly competed with the TV.
+- **Next:** wait for recovery — signature is streams going 502/407/HTML → 302 → real TS data — then
+  retune. SNF Chiefs at Seahawks (#363) was still ~3.5 h away when this was written.
+
 ## 2026-10-25 (Sun 08:12 CDT): Steelers at Saints on #352 — and a wrong-game failover trap
 - **Request:** "put on the nfl game that's on right now". The only game in the early window is the
   **NFL Paris game — Steelers at Saints, kickoff 08:30 CDT** (9:30am ET, at Saint-Denis, the first
