@@ -24,6 +24,24 @@
 - **Provider-wide stream/API failures are usually the provider, not the stack.** Before
   touching bindings, curl 2+ unrelated channels' URLs: 502-on-all = origin outage (wait);
   403-on-player_api-only = rate limit from too many API calls (live streams keep working).
+- **An outage can present as "connecting forever", not as 502-on-everything.** 2026-10-25: every
+  channel sat in `state: connecting` (KXAN #101, ESPN #301, RedZone #325, NFL slots #358/#361) with
+  `Invalid data found when processing input` and `waiting for buffer to fill: 0/4 chunks` repeating,
+  while the box dropped its client (`Broken pipe … (192.168.1.182)`) and ended with **no active
+  player at all**. The tells that it was upstream, in the order that worked:
+  1. **Is there an active player?** `Player.GetActivePlayers` → `[]` while `JSONRPC.Ping` → `pong`
+     means "idle, not wedged" (a wedge hangs `Player.*` but still answers ping).
+  2. **Are *unrelated* channels stuck too?** KXAN and ESPN failing alongside RedZone rules out the
+     channel, the fixture and the failover set in a single step.
+  3. **Probe the provider URL directly with the pinned UA, several times.** The *same* URL returned
+     **407, then 502, then a connection timeout, then `200` with 53 bytes of HTML** — inconsistent
+     non-video responses. A one-shot probe can succeed by luck and mislead you.
+  4. **Hit `player_api.php`** — it answered `{"error":"There is an Database Error","status":false}`,
+     an origin-side error that no local change can fix.
+  Confirmed *not* the problem: the web root answered **401 on both address families** (a ban is 403)
+  and `getent ahosts cf.vovu.top` was still A-first (so not the family flip). Then wait — do not touch
+  bindings. Watch the escalation shape: 502s ran 1/4/2/1 per hour for four hours, then **20 in one
+  hour** at the peak.
 - **A 403 on *every* endpoint (including live streams) can be address-family-specific.**
   2026-10-01: `cf.vovu.top` 403'd our egress **IPv4** but served **IPv6** (`curl -4` → 403,
   `curl -6` → 302, same URL/UA/host). A bridge container has **no IPv6 route**, so it could
