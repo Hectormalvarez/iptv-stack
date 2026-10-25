@@ -43,6 +43,12 @@
 
 ## Pending ⚠️
 - _(done 2026-10-11)_ box power-cycled; **#410 NBC 5 Chicago (WMAQ) is playing the Chicago Marathon**.
+- **Audit `order=1` sources whose fixture differs from `order=0`.** `#321` and `#2251` both fail over
+  to `NFL  | 4k - SNF 8:20pm Chiefs at Seahawks` — a *different game* — because
+  `add-backup-streams.py` matched on the network name, not the fixture. A failover rotation would
+  silently show the wrong match. Likely affects other network channels that also have per-fixture
+  slot feeds, so the audit should compare every `ChannelStream(order=1).stream.name` against
+  `order=0`, not just count sources.
 - **#104 ABC 13 (KTRK Houston) is single-source.** It carried Ole Miss at Texas on 2026-10-24 and is
   the only usable ABC feed in the profile, so any ABC game still dies at the provider's hourly reset
   (`add-backup-streams.py` hardened 475 channels but not this one). Duplicate candidates spotted:
