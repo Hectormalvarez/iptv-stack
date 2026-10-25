@@ -13,6 +13,14 @@
   then generates placeholder programmes named after the channel.
 - **A single stream per channel is fragile.** Providers reset streams ~hourly and refuse the
   immediate reconnect (4XX). Failover only works if a `ChannelStream(order=1)` exists.
+- **A "backup" source can carry the WRONG FIXTURE — a multi-source count is not proof of a mirror.**
+  `add-backup-streams.py` matches duplicates by stream *name*, and provider **network** feeds
+  (`US: NFL NETWORK HD`, `US: NFL NETWORK ᴴᴰ`) are also duplicated by **event slots**
+  (`NFL  | 4k - SNF 8:20pm Chiefs at Seahawks`). So #321/#2251 report 2 sources whose `order=1` is a
+  *different game*: on a failover rotation the viewer silently gets tonight's SNF match instead of
+  the one they tuned to. For anything with a per-fixture slot feed, the **slot channel is the correct
+  primary**, and a network channel's slot "backup" is worse than no backup. Compare
+  `ChannelStream(order=1).stream.name` against `order=0`'s fixture before trusting a source count.
 - **Provider-wide stream/API failures are usually the provider, not the stack.** Before
   touching bindings, curl 2+ unrelated channels' URLs: 502-on-all = origin outage (wait);
   403-on-player_api-only = rate limit from too many API calls (live streams keep working).
