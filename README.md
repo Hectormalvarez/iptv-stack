@@ -60,6 +60,43 @@ docker exec dispatcharr sh -lc 'getent ahosts cf.vovu.top | head -1'   # a 2606:
 therefore IPv4-only, so its daily run kept hitting the blocked IPv4. Jellyfin now uses host
 networking too, and the scheduled sync is **off** — see *Provider VOD library*.
 
+### Second provider (ZQAVO) — cross-provider failover (2026-10-25)
+
+A second subscription is wired in **only** as a failover source. Credentials live in the
+Dispatcharr M3U account, never here.
+
+- **Why:** on 2026-10-25 STRONG8K 403'd this host's IPv4 and then 502'd **both** address families
+  for hours. That took out the primary *and* every failover on every channel, because they were
+  all the same provider — the failover design was useless against the failure mode that actually
+  happens.
+- **What:** Dispatcharr M3U account `ZQAVO` (`line.zqavo.top`, XC, **`max_connections: 1`**,
+  33,614 live streams in 725 categories), imported with a **tight group selection** — 13 `|US|`
+  categories → **1,529 streams** — because provider API abuse blocks are the documented failure
+  mode. `player_api.php` works; **`get.php` and `xmltv.php` return 502**, which is fine here: a
+  failover source inherits the channel's existing EPG binding.
+- **How:** `scripts/add-cross-provider-failover.py` (dry-run by default, `FAILOVER_APPLY=1`)
+  attaches the new feed at the **highest** `ChannelStream.order`, so Dispatcharr only reaches it
+  after every primary source has failed. Currently **22 channels** — the Austin locals (the new
+  provider even carries `|US| ABC 24 (KVUE) Austin`, the *real* Austin ABC the old provider never
+  had), ESPN/ESPN2/ESPN News/ESPN USA/CBSSN/FS1/FS2, NFL Network ×4, RedZone, SEC/ACC/BTN, and the
+  `NCAAF 03/09/10` network feeds.
+- **Import gotcha:** Dispatcharr only creates streams for **enabled** groups. With
+  `auto_enable_new_groups_*` off, a fresh account gets one `ChannelGroupM3UAccount` row per category
+  — **all disabled** — and a refresh that reports `No streams returned from Xtream Codes provider`.
+  Enable the groups you want, refresh again (1,529 streams imported in 5.7 s).
+- **It can never be a primary:** `max_connections: 1` means it cannot serve two channels at once.
+
+**The wrong-fixture trap (this is why matching is an explicit table, not fuzzy).**
+`add-backup-streams.py` matches duplicates by *name normalisation*, and provider **network** feeds
+are duplicated by **event slots**. The result was that `#321`, `#1680`, `#1681` and `#2251` (all
+NFL Network) carried `NFL  | 4k - SNF 8:20pm Chiefs at Seahawks` as their `order=1` "backup" — a
+completely different broadcast, so a failover rotation would have silently switched the viewer to
+tonight's Sunday Night game. Those 4 links were **removed** and the channels re-pointed at the new
+provider's *correct* NFL Network feed. `add-cross-provider-failover.py` therefore takes an explicit
+`(channel number, group, stream-name substring)` table and **never** touches numbered fixture slots
+(`NFL  | 02 - 1pm Steelers at Saints`, `NCAAF 42: …`), whose fixtures the two providers number
+independently.
+
 ## EPG pipeline (reworked 2026-09-26)
 
 Three EPG sources feed Dispatcharr:
