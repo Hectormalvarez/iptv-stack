@@ -35,7 +35,10 @@
      channel, the fixture and the failover set in a single step.
   3. **Probe the provider URL directly with the pinned UA, several times.** The *same* URL returned
      **407, then 502, then a connection timeout, then `200` with 53 bytes of HTML** — inconsistent
-     non-video responses. A one-shot probe can succeed by luck and mislead you.
+     non-video responses. A one-shot probe can succeed by luck and mislead you: mid-outage the same
+     URL delivered a **12.8 MB burst and then 0 bytes nine seconds later**. So recovery needs
+     *consecutive* good probes — `scripts/watch-provider-recovery.sh` requires `NEED_STREAK=2` and
+     measures **bytes, not status codes** (the URL answered `200` with 53 bytes of HTML throughout).
   4. **Hit `player_api.php`** — it answered `{"error":"There is an Database Error","status":false}`,
      an origin-side error that no local change can fix.
   Confirmed *not* the problem: the web root answered **401 on both address families** (a ban is 403)
