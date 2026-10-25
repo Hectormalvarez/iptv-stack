@@ -30,6 +30,7 @@ scripts/remap-epg.py            region-aware EPG fix via ChannelOverride (REMAP_
 scripts/label-event-slots.py    labels PPV slots with the provider fixture (LABEL_APPLY=1)
 scripts/add-backup-streams.py   attaches failover sources (BACKUP_APPLY=1)
 scripts/verify-stack.sh         read-only health check
+scripts/watch-provider-recovery.sh  waits out a provider outage, then retunes the box (probes via the HDHR lineup)
 scripts/cec-vizio-bringup.sh    Vizio CEC diagnostics / --apply-vizio
 scripts/install-arctic-fuse3.sh AF3 skin side-by-side installer
 ```
