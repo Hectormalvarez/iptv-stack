@@ -67,6 +67,9 @@ MAPPING = [
     (307, 'Sports', 'US| FOX SPORTS 2 HD (S)'),
     # league networks
     (321, 'Sports: NFL', 'US| NFL NETWORK FHD (S)'),
+    (1680, 'Mexico VIP', 'US| NFL NETWORK FHD (S)'),
+    (1681, 'Mexico VIP', 'US| NFL NETWORK FHD (S)'),
+    (2251, 'Sports: NFL', 'US| NFL NETWORK FHD (S)'),
     (325, 'Sports: NFL', 'US| NFL REDZONE FHD (S)'),
     (326, 'Sports: College', 'US| ESPN SEC NETWORK HD (S)'),
     (327, 'Sports: College', 'US| ESPN ACC NETWORK HD (S)'),
