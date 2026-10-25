@@ -26,6 +26,30 @@
 - **Next:** wait for recovery — signature is streams going 502/407/HTML → 302 → real TS data — then
   retune. SNF Chiefs at Seahawks (#363) was still ~3.5 h away when this was written.
 
+### Follow-up (17:15 CDT): the outage was partly OURS — `gai.conf` pinned the blocked family
+- The triage above correctly identified a failing provider, but missed a second, **self-inflicted**
+  fault. Testing per family: **IPv4 stream → 403 / `000` on connect, IPv6 stream → 200 + 25 MB of
+  `video/mp2t`**. So the ban had flipped a third time, and `config/gai.conf`
+  (`precedence ::ffff:0:0/96 100`, added 2026-10-04) was forcing every container lookup to the
+  **blocked** family. Proof:
+  `docker exec dispatcharr sh -lc 'getent ahosts cf.vovu.top | head -1'` → `104.21.52.9` (IPv4)
+  while IPv6 was serving perfectly. That also explains the *intermittent* 12–21 MB bursts seen
+  through the proxy: sometimes the IPv4 attempt failed fast enough for the client to fall back to
+  IPv6, sometimes it hung at `waiting for buffer to fill: 0/4 chunks`.
+- **Fixed:** removed the override — glibc's RFC 3484 default prefers AAAA when the host holds a
+  global IPv6 address — then `docker restart dispatcharr jellyfin`, because **glibc caches
+  gai.conf per process, so a reload is not enough**. After the restart the container resolves to
+  `2606:4700:3036::ac43:c0c8` (IPv6). See `decisions.md` #26.
+- **Not sufficient yet:** the provider's origin then went down entirely — **502 on BOTH families** —
+  so streams still fail. The `gai.conf` fix is correct and necessary; it just cannot fix an origin
+  outage. Nothing further to do locally.
+- **Bug fixed in my own watcher:** `scripts/watch-provider-recovery.sh`'s `kodi_idle()` used the
+  inverse test (`grep -q '"result":\[\]'`, miss ⇒ busy), so a transient empty JSON-RPC answer was
+  read as "already playing" and **silently cancelled the retune at the exact moment the provider
+  recovered** (`recovered, but the box is already playing - not touching it` while
+  `Player.GetActivePlayers` was `[]`). Replaced with a positive `box_playing()` test on
+  `"result":[{`.
+
 ## 2026-10-25 (Sun 08:12 CDT): Steelers at Saints on #352 — and a wrong-game failover trap
 - **Request:** "put on the nfl game that's on right now". The only game in the early window is the
   **NFL Paris game — Steelers at Saints, kickoff 08:30 CDT** (9:30am ET, at Saint-Denis, the first
