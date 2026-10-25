@@ -1,4 +1,27 @@
-# Active Context (2026-10-24)
+# Active Context (2026-10-25)
+
+## 2026-10-25 (Sun 08:12 CDT): Steelers at Saints on #352 — and a wrong-game failover trap
+- **Request:** "put on the nfl game that's on right now". The only game in the early window is the
+  **NFL Paris game — Steelers at Saints, kickoff 08:30 CDT** (9:30am ET, at Saint-Denis, the first
+  NFL game played in France). From 08:00 the NFL feeds carry *"NFL Gameday Kickoff"* pregame.
+- **Done:** resolved pvrid **5242** = `NFL: 9:30am Steelers at Saints` (profile **#352**,
+  `Sports: NFL`, channel uuid `74f8bce5-…`), `Player.Open` → `OK`. Verified: correct label,
+  `live: true`, `speed: 1`, h264 1280×720, Dispatcharr
+  `Channel 74f8bce5-… has 1 clients, state: active`, **0×403**, the old ABC session stopped cleanly,
+  no stream-health warnings, box still responsive (**no wedge** — a plain zap remains safe).
+- **⚠️ Wrong-game failover trap found:** `#321` and `#2251` both report **2 sources**, but their
+  `order=1` is `NFL  | 4k - SNF 8:20pm Chiefs at Seahawks` — the **Sunday Night slot**, i.e. a
+  *different fixture*. `add-backup-streams.py` matched on the network name (`NFL NETWORK`), not the
+  game, so a failover rotation would silently switch the viewer to tonight's SNF game. For a
+  per-fixture event feed, the **dedicated slot channel (#352) is the correct primary** — a network
+  channel's slot "backup" is worse than no backup.
+- **Also checked, not taken:** the **Chivas–Monterrey** Liga MX game (Jornada 14, Apertura 2026,
+  Monterrey at home, Estadio Monterrey) *was* available on **#1876 `VIP: TUDN`** (2 sources:
+  `VIP: TUDN` + `MX: TUDN`) and `#701 US: Univision23 (WLTV) Miami`, window 19:30–22:00 CDT on
+  2026-10-24. Not on any PPV slot — the whole `US| SOCCER PPV` group read `NO EVENT STREAMING NOW`
+  or other fixtures. Guide showed it only as generic *"Fútbol Mexicano Primera División"*.
+- **Guide-time note:** Dispatcharr prints UTC, so 13:12 UTC = 08:12 CDT — confirmed against the host
+  clock (`TZ=America/Chicago date`) before quoting any kickoff.
 
 ## 2026-10-24 (Sat evening): Ole Miss at Texas pulled up on ABC — plain zap, no wedge
 - **Request:** "pull up the college football game" — the game is **not identifiable from the guide**.
