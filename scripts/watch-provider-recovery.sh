@@ -80,11 +80,15 @@ for c in d['result']['channels']:
 }
 
 # Only retune when nothing is playing, so we can never steal a channel the user
-# already put on by hand.
-kodi_idle() {
-  curl -s -m 8 -u kodi:kodi -H 'Content-Type: application/json' \
-    -d '{"jsonrpc":"2.0","id":2,"method":"Player.GetActivePlayers"}' "$KODI" \
-    | grep -q '"result":\[\]'
+# already put on by hand. This is a POSITIVE test on purpose: an empty or failed
+# JSON-RPC answer must not be read as "busy". The original inverse form
+# (`grep -q '"result":\[\]"` and treat a miss as busy) silently cancelled the
+# retune during the 2026-10-25 recovery.
+box_playing() {
+  local out
+  out=$(curl -s -m 8 -u kodi:kodi -H 'Content-Type: application/json' \
+        -d '{"jsonrpc":"2.0","id":2,"method":"Player.GetActivePlayers"}' "$KODI")
+  [ -n "$out" ] && echo "$out" | grep -q '"result":\[{'
 }
 
 retune() {
@@ -103,7 +107,7 @@ retune() {
 
 # ---------------------------------------------------------------------------
 log "watcher started: target #$TARGET_NUM '$TARGET_NAME', giving up after ${MAX_MIN}m"
-if ! kodi_idle; then
+if box_playing; then
   log "box is already playing something - leaving it alone, exiting"
   exit 0
 fi
@@ -116,10 +120,10 @@ while [ "$(date +%s)" -lt "$deadline" ]; do
     log "probe ok (${streak}/${NEED_STREAK} consecutive)"
     if [ "$streak" -ge "$NEED_STREAK" ]; then
       log "PROVIDER RECOVERED (${NEED_STREAK} consecutive good probes)"
-      if kodi_idle; then
-        retune && log "DONE"
-      else
+      if box_playing; then
         log "recovered, but the box is already playing - not touching it"
+      else
+        retune && log "DONE"
       fi
       exit 0
     fi
