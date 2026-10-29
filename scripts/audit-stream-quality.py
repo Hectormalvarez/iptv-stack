@@ -61,6 +61,7 @@ PROBE = os.environ.get('AUDIT_PROBE', '') == '1'
 SCOPE = os.environ.get('AUDIT_SCOPE', 'pilot')
 SAMPLE_SECONDS = int(os.environ.get('AUDIT_SAMPLE_SECONDS', '25'))
 PAUSE_BETWEEN = float(os.environ.get('AUDIT_PAUSE_SECONDS', '5'))
+USE_EXISTING_STATS = os.environ.get('AUDIT_USE_EXISTING_STATS', '1') == '1'
 
 # Rough scoping only. The audit never changes anything.
 CORE_GROUPS = [
@@ -226,6 +227,40 @@ def probe_stream_ffmpeg(url):
         return {'ok': False, 'error': 'ffmpeg_exception'}
 
 
+def existing_probe_result(stream):
+    """Convert Dispatcharr's saved stream stats into the same probe shape."""
+    stats = stream.stream_stats or {}
+    if not stats:
+        return None
+    width = height = None
+    res = stats.get('resolution') or ''
+    m = re.match(r'(\d+)x(\d+)', str(res))
+    if m:
+        width, height = int(m.group(1)), int(m.group(2))
+    bitrate = stats.get('ffmpeg_output_bitrate')
+    return {
+        'metadata': {
+            'ok': True,
+            'video_codec': stats.get('video_codec'),
+            'width': width,
+            'height': height,
+            'fps': stats.get('source_fps'),
+            'pixel_format': stats.get('pixel_format'),
+            'audio_codec': stats.get('audio_codec'),
+            'audio_channels': stats.get('audio_channels'),
+            'audio_sample_rate': stats.get('sample_rate'),
+        },
+        'sample': {
+            'ok': True,
+            'status': 200,
+            'bytes': None,
+            'elapsed': None,
+            'throughput_mbps': (bitrate / 1000) if bitrate else None,
+            'error': None,
+        },
+    }
+
+
 def probe_stream(stream):
     """Probe one stream through Dispatcharr's stream-specific proxy path."""
     if not stream.stream_hash:
@@ -234,6 +269,7 @@ def probe_stream(stream):
     url = f"http://localhost:9191/proxy/ts/stream/{stream.stream_hash}"
     result = probe_stream_ffmpeg(url)
     return {'metadata': result.get('metadata', {}), 'sample': result.get('sample', {})}
+
 
 
 def quality_tier(meta, sample, is_sports):
@@ -306,13 +342,15 @@ def main():
               if c.channel_group and c.channel_group.name in CORE_GROUPS]
         scope_label = 'core'
 
-    print('profile %r scope=%s channels=%d probe=%s' % (PROFILE, scope_label, len(qs), PROBE))
+    print('profile %r scope=%s channels=%d probe=%s use_existing_stats=%s' % (
+        PROFILE, scope_label, len(qs), PROBE, USE_EXISTING_STATS))
 
     report = {
         'generated_at': datetime.now(timezone.utc).isoformat(),
         'profile': PROFILE,
         'scope': scope_label,
         'probe': PROBE,
+        'use_existing_stats': USE_EXISTING_STATS,
         'channels': [],
     }
 
@@ -337,7 +375,11 @@ def main():
             provider = s.m3u_account.name if s.m3u_account else None
             existing_stats = s.stream_stats or {}
             existing_fresh = bool(s.stream_stats_updated_at)
-            probe_result = probe_stream(s) if PROBE and provider != 'ZQAVO' else None
+            probe_result = None
+            if USE_EXISTING_STATS and existing_stats:
+                probe_result = existing_probe_result(s)
+            if not probe_result and PROBE and provider != 'ZQAVO':
+                probe_result = probe_stream(s)
             meta = probe_result['metadata'] if probe_result else {}
             sample = probe_result['sample'] if probe_result else {}
             measured = bool(meta) or bool(sample)
@@ -358,7 +400,7 @@ def main():
                 'warnings': warnings,
             })
         report['channels'].append(entry)
-        if PROBE:
+        if PROBE and any(src['measured'] and src['sample'].get('elapsed') for src in entry['sources']):
             time.sleep(PAUSE_BETWEEN)
 
     tiers = Counter()
