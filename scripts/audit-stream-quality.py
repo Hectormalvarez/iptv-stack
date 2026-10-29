@@ -278,6 +278,13 @@ def health_warnings(meta, sample):
     return warnings
 
 
+TIER_SCORE = {'S': 4, 'A': 3, 'B': 2, 'C': 1, 'D': 0}
+
+
+def tier_score(value):
+    return TIER_SCORE.get(value, -1)
+
+
 def main():
     prof = ChannelProfile.objects.filter(name=PROFILE).first()
     if not prof:
@@ -364,11 +371,9 @@ def main():
                       if s['tier'] and not s['warnings'] and not ch['event_slot']]
         if candidates:
             current = ch['sources'][0]
-            best = max(candidates,
-                       key=lambda s: {'S': 4, 'A': 3, 'B': 2, 'C': 1, 'D': 0}.get(s['tier'], -1))
-            current_score = {'S': 4, 'A': 3, 'B': 2, 'C': 1, 'D': 0}.get(
-                current.get('tier') or 'unknown', -1)
-            if best['tier'] > current.get('tier') or current_score < 0:
+            best = max(candidates, key=lambda s: tier_score(s['tier']))
+            current_score = tier_score(current.get('tier') or 'unknown')
+            if tier_score(best['tier']) > current_score or current_score < 0:
                 recommendations += 1
 
     print('tiers:', dict(tiers))
