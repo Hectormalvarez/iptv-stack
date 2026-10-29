@@ -5,3 +5,5 @@ recordings/
 .env
 .env.*
 watchstate/data/
+__pycache__/
+
