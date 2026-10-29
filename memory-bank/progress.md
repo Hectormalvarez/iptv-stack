@@ -40,8 +40,18 @@
   No-Guide sweep reapplied. Event labels were already current (0 changes)
 - **Repo**: conventional commits throughout, credentials kept out of git (no commit count here —
   it went stale on every docs commit, and the last one existed only to bump it)
+- **Stream-quality audit + ordered apply (2026-10-29)**: read-only audit script uses Dispatcharr's
+  stream-specific proxy path with a single ffmpeg pass; core report generated from fresh Dispatcharr
+  stats. Conservative apply promoted 4 clearly better sources (Eleven Sports, Tennis, MoviePlex,
+  Big Ten Network), leaving event slots and ZQAVO untouched.
 
 ## Pending ⚠️
+- **Kodi SSH key still needs installing at the box** (2026-10-29): `root@k5320.lan` answers but
+  rejects key auth. Remote recovery, skin activation and log-based checks remain blocked on this.
+- **Arctic Fuse 3 activation is still manual at the TV** (2026-10-29): installer now targets 3.4.13
+  + current deps, but the installed skin is still 3.3.1 and stock Estuary remains active.
+- **Event-slot EPG pilot is prepared but not applied** (2026-10-29): only explicit-date fixtures are
+  eligible; time-only NFL names must not be turned into recurring dummy guide rows.
 - _(done 2026-10-11)_ box power-cycled; **#410 NBC 5 Chicago (WMAQ) is playing the Chicago Marathon**.
 - _(done 2026-10-25)_ **`order=1` fixture-mismatch audit complete.** 4 wrong-game links removed —
   #321/#1680/#1681/#2251 (all NFL Network) were falling over to `NFL  | 4k - SNF 8:20pm Chiefs at
