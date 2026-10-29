@@ -449,6 +449,56 @@ deliberately blank `No Guide` group** (must stay ≥95%), that all three EPG sou
 `/mnt/storage` has room, and that a backup landed in the last 2 days. Exit code is non-zero when
 something FAILs. The Kodi checks (display mode, log errors, segfault count) need key-based SSH; password
 auth is deliberately not baked into the script.
+### Stream quality audit (`scripts/audit-stream-quality.py`)
+
+Read-only quality probe for the curated Kodi profile. It never changes order and never touches ZQAVO.
+The probe goes through Dispatcharr's stream-specific proxy path and uses one ffmpeg pass per source, so
+it avoids the provider's immediate-reconnect 503s and keeps two primary connections free for viewing.
+
+```bash
+# inventory only (no provider load)
+docker exec -i dispatcharr python manage.py shell < scripts/audit-stream-quality.py
+
+# 11-channel pilot probe
+docker exec -e AUDIT_PROBE=1 -i dispatcharr python manage.py shell \
+    < scripts/audit-stream-quality.py
+
+# full core scope probe (locals/entertainment/news/kids/movies/spanish/sports)
+docker exec -e AUDIT_PROBE=1 AUDIT_SCOPE=core -i dispatcharr python manage.py shell \
+    < scripts/audit-stream-quality.py
+```
+
+The report lands at `/data/audit/latest.json` inside the Dispatcharr data volume. It records measured
+resolution/fps/bitrate plus existing Dispatcharr stats, and classifies sources by an explainable tier
+(`S/A/B/C/D/unknown`) with health warnings. It is intentionally not a score; identity and stability
+outrank resolution.
+
+To apply reviewed ordering changes:
+
+```bash
+docker exec -i dispatcharr python manage.py shell < scripts/apply-stream-quality.py          # dry run
+docker exec -e QUALITY_APPLY=1 -i dispatcharr python manage.py shell \
+    < scripts/apply-stream-quality.py
+```
+
+The apply step only reorders streams already attached to a channel, never promotes event slots, and
+always leaves ZQAVO deepest. A per-run order backup is written to `/data/audit/orders-<timestamp>.json`.
+
+### Event-slot EPG pilot (`scripts/configure-event-epg.py`)
+
+Only for provider streams that carry an explicit date in the stream name. Time-only slots (e.g.
+`SNF 8:20pm`) are deliberately excluded: the dummy generator would otherwise repeat them on the wrong
+day. The script is dry-run by default and only binds channels explicitly passed by ID.
+
+```bash
+# inspect one NBA slot (id, not channel number)
+docker exec -e EVENT_EPG_CHANNEL_IDS=5492 -i dispatcharr python manage.py shell \
+    < scripts/configure-event-epg.py
+
+# bind that one slot to the pilot NBA dummy source
+docker exec -e EVENT_EPG_APPLY=1 EVENT_EPG_CHANNEL_IDS=5492 -i dispatcharr python manage.py shell \
+    < scripts/configure-event-epg.py
+```
 
 ### Timezones (fixed 2026-09-26)
 
