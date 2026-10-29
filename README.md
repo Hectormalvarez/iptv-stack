@@ -464,6 +464,7 @@ docker exec -e AUDIT_PROBE=1 -i dispatcharr python manage.py shell \
     < scripts/audit-stream-quality.py
 
 # full core scope probe (locals/entertainment/news/kids/movies/spanish/sports)
+# this reuses fresh Dispatcharr stream stats first, then probes only what is missing
 docker exec -e AUDIT_PROBE=1 AUDIT_SCOPE=core -i dispatcharr python manage.py shell \
     < scripts/audit-stream-quality.py
 ```
