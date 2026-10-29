@@ -10,6 +10,7 @@ set -u
 DEST=/storage/.kodi/addons
 TMP=/storage/af3-install
 JMC=https://raw.githubusercontent.com/jurialmunkey/repository.jurialmunkey/master/omega/zips
+JMC_REPO=https://raw.githubusercontent.com/jurialmunkey/repository.jurialmunkey/master/repo/zips
 KODI=https://mirrors.kodi.tv/addons/omega
 mkdir -p "$TMP"
 
@@ -34,13 +35,15 @@ fetch_install() {
 fetch_install https://jurialmunkey.github.io/repository.jurialmunkey/repository.jurialmunkey-3.4.zip
 
 # Skin + declared dependencies
-fetch_install "$JMC/skin.arctic.fuse.3/skin.arctic.fuse.3-3.3.1.zip"
-fetch_install "$JMC/script.skinvariables/script.skinvariables-2.2.4.zip"
+fetch_install "$JMC/skin.arctic.fuse.3/skin.arctic.fuse.3-3.4.13.zip"
+fetch_install "$JMC/script.skinvariables/script.skinvariables-2.2.9.zip"
 fetch_install "$JMC/script.texturemaker/script.texturemaker-0.2.11.zip"
-fetch_install "$JMC/plugin.video.themoviedb.helper/plugin.video.themoviedb.helper-6.17.3.zip"
+fetch_install "$JMC/plugin.video.themoviedb.helper/plugin.video.themoviedb.helper-6.19.4.zip"
 fetch_install "$JMC/script.module.jurialmunkey/script.module.jurialmunkey-0.2.35.zip"
-fetch_install "$JMC/script.module.infotagger/script.module.infotagger-0.0.9.zip"
+fetch_install "$JMC/script.module.infotagger/script.module.infotagger-0.1.0.zip"
 fetch_install "$JMC/resource.font.robotocjksc/resource.font.robotocjksc-0.0.3.zip"
+fetch_install "$JMC_REPO/resource.images.arctic.splash/resource.images.arctic.splash-1.1.0.zip"
+fetch_install "$JMC_REPO/resource.images.arctic.weather/resource.images.arctic.weather-1.0.4.zip"
 
 # Dependencies served by the official Kodi repo
 fetch_install "$KODI/script.module.addon.signals/script.module.addon.signals-0.0.6+matrix.1.zip"
@@ -60,7 +63,8 @@ missing=0
 for a in skin.arctic.fuse.3 repository.jurialmunkey script.skinvariables script.texturemaker \
          plugin.video.themoviedb.helper script.module.jurialmunkey script.module.infotagger \
          resource.font.robotocjksc script.module.addon.signals script.module.qrcode \
-         resource.images.weathericons.white resource.images.studios.coloured; do
+         resource.images.weathericons.white resource.images.studios.coloured \
+         resource.images.arctic.splash resource.images.arctic.weather; do
   if [ -f "$DEST/$a/addon.xml" ]; then
     printf '  OK   %s\n' "$a"
   else
