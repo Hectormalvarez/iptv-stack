@@ -118,76 +118,112 @@ def fps_from_ffprobe(value):
         return None
 
 
-def probe_metadata(url):
-    """Return codec/resolution/fps metadata for one stream."""
+def probe_stream_ffmpeg(url):
+    """Single-connection probe: remux a short sample and parse stream metadata.
+
+    Using one ffmpeg pass avoids the provider's immediate-reconnect refusal: a
+    separate ffprobe plus a separate sample often looks like a second connection
+    and gets 503'd, which would otherwise be misread as a stream health problem.
+    """
     cmd = [
-        'ffprobe', '-v', 'error',
-        '-analyzeduration', '3000000', '-probesize', '3000000',
-        '-show_streams', '-show_format', '-of', 'json', url,
+        'ffmpeg', '-hide_banner', '-nostdin',
+        '-i', url,
+        '-t', str(SAMPLE_SECONDS),
+        '-map', '0:v:0', '-map', '0:a:0?',
+        '-c', 'copy', '-f', 'null', '-',
     ]
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=20)
-        if proc.returncode != 0:
-            return {'ok': False, 'error': 'ffprobe_failed'}
-        data = json.loads(proc.stdout)
-        video = next((s for s in data.get('streams', []) if s.get('codec_type') == 'video'), None)
-        audio = next((s for s in data.get('streams', []) if s.get('codec_type') == 'audio'), None)
-        if not video:
-            return {'ok': False, 'error': 'no_video_stream'}
-        return {
-            'ok': True,
-            'video_codec': video.get('codec_name'),
-            'width': video.get('width'),
-            'height': video.get('height'),
-            'fps': fps_from_ffprobe(video.get('avg_frame_rate') or video.get('r_frame_rate')),
-            'pixel_format': video.get('pix_fmt'),
-            'audio_codec': audio.get('codec_name') if audio else None,
-            'audio_channels': audio.get('channels') if audio else None,
-            'audio_sample_rate': audio.get('sample_rate') if audio else None,
-        }
-    except Exception:
-        return {'ok': False, 'error': 'ffprobe_exception'}
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=SAMPLE_SECONDS + 15)
+        stderr = proc.stderr or ''
+        if proc.returncode != 0 and 'time=' not in stderr:
+            return {'ok': False, 'error': 'ffmpeg_failed', 'stderr_tail': stderr[-500:]}
 
+        video = None
+        audio = None
+        for line in stderr.splitlines():
+            if video is None and ': Video:' in line:
+                video = line
+            if audio is None and ': Audio:' in line:
+                audio = line
 
-def sample_stream(url):
-    """Measure a short live sample without decoding video."""
-    started = time.monotonic()
-    first_byte = None
-    total = 0
-    status = None
-    try:
-        with requests.get(url, stream=True, timeout=(5, SAMPLE_SECONDS + 5)) as resp:
-            status = resp.status_code
-            if status != 200:
-                return {
-                    'ok': False, 'status': status, 'bytes': 0,
-                    'elapsed': round(time.monotonic() - started, 2),
-                    'throughput_mbps': None, 'error': 'http_error',
-                }
-            for chunk in resp.iter_content(chunk_size=65536):
-                if first_byte is None:
-                    first_byte = time.monotonic()
-                total += len(chunk)
-                if time.monotonic() - started >= SAMPLE_SECONDS:
-                    break
-        elapsed = time.monotonic() - started
-        return {
-            'ok': total > 0,
-            'status': status,
-            'bytes': total,
-            'elapsed': round(elapsed, 2),
-            'startup_seconds': round(first_byte - started, 2) if first_byte else None,
-            'throughput_mbps': round((total * 8) / elapsed / 1_000_000, 2) if elapsed else None,
-            'error': None if total > 0 else 'no_data',
-        }
-    except requests.exceptions.Timeout:
-        return {'ok': False, 'status': status, 'bytes': total,
-                'elapsed': round(time.monotonic() - started, 2),
-                'throughput_mbps': None, 'error': 'timeout'}
+        def parse_video(line):
+            # Stream #0:0[0x1ff]: Video: h264 (High) ..., yuv420p(...), 1280x720 ..., 59.94 fps, ...
+            codec = re.search(r'Video:\s*([A-Za-z0-9_]+)', line)
+            dims = re.search(r'(\d{2,5})x(\d{2,5})', line)
+            fps = re.search(r'([0-9]+(?:\.[0-9]+)?)\s*fps', line)
+            pix = re.search(r',\s*([a-zA-Z0-9_]+)\s*(?:\(|,)', line)
+            return {
+                'video_codec': codec.group(1) if codec else None,
+                'width': int(dims.group(1)) if dims else None,
+                'height': int(dims.group(2)) if dims else None,
+                'fps': float(fps.group(1)) if fps else None,
+                'pixel_format': pix.group(1) if pix else None,
+            }
+
+        def parse_audio(line):
+            codec = re.search(r'Audio:\s*([A-Za-z0-9_]+)', line)
+            rate = re.search(r'(\d{3,6})\s*Hz', line)
+            channels = re.search(r'(\d+)\s*channels', line)
+            if channels:
+                channels = int(channels.group(1))
+            elif re.search(r'\bstereo\b', line, re.I):
+                channels = 2
+            elif re.search(r'\bmono\b', line, re.I):
+                channels = 1
+            else:
+                channels = None
+            return {
+                'audio_codec': codec.group(1) if codec else None,
+                'audio_sample_rate': int(rate.group(1)) if rate else None,
+                'audio_channels': channels,
+            }
+
+        meta = {'ok': video is not None}
+        if video:
+            meta.update(parse_video(video))
+        if audio:
+            meta.update(parse_audio(audio))
+
+        bitrate = None
+        elapsed = None
+        total_kib = None
+        for line in reversed(stderr.splitlines()):
+            if total_kib is None and 'video:' in line and 'audio:' in line:
+                sizes = re.findall(r'(\d+(?:\.\d+)?)\s*(KiB|MiB)', line)
+                total_kib = sum(
+                    float(num) * (1024 if unit.lower() == 'mib' else 1)
+                    for num, unit in sizes)
+            if bitrate is None:
+                m = re.search(r'bitrate=\s*([0-9.]+)\s*kbits/s', line)
+                if m:
+                    bitrate = float(m.group(1))
+            if elapsed is None:
+                m = re.search(r'time=(\d+):(\d+):(\d+(?:\.\d+)?)', line)
+                if m:
+                    elapsed = int(m.group(1)) * 3600 + int(m.group(2)) * 60 + float(m.group(3))
+            if elapsed is not None and (bitrate is not None or total_kib is not None):
+                break
+
+        if bitrate is None and total_kib is not None and elapsed:
+            bitrate = (total_kib * 1024 * 8) / elapsed / 1000
+
+        if bitrate is not None:
+            sample = {
+                'ok': True,
+                'status': 200,
+                'bytes': int(total_kib * 1024) if total_kib is not None else None,
+                'elapsed': round(elapsed, 2) if elapsed else SAMPLE_SECONDS,
+                'throughput_mbps': round(bitrate / 1000, 2),
+                'error': None,
+            }
+        else:
+            sample = {'ok': False, 'status': None, 'bytes': None,
+                      'elapsed': elapsed, 'throughput_mbps': None,
+                      'error': 'no_bitrate'}
+
+        return {'metadata': meta, 'sample': sample}
     except Exception:
-        return {'ok': False, 'status': status, 'bytes': total,
-                'elapsed': round(time.monotonic() - started, 2),
-                'throughput_mbps': None, 'error': 'request_exception'}
+        return {'ok': False, 'error': 'ffmpeg_exception'}
 
 
 def probe_stream(stream):
@@ -196,9 +232,8 @@ def probe_stream(stream):
         return {'ok': False, 'error': 'no_stream_hash'}
     # Never leak the URL into logs; it is only used in-process.
     url = f"http://localhost:9191/proxy/ts/stream/{stream.stream_hash}"
-    meta = probe_metadata(url)
-    sample = sample_stream(url)
-    return {'metadata': meta, 'sample': sample}
+    result = probe_stream_ffmpeg(url)
+    return {'metadata': result.get('metadata', {}), 'sample': result.get('sample', {})}
 
 
 def quality_tier(meta, sample, is_sports):
