@@ -30,6 +30,7 @@ Apply the pilot audit:
 
 import json
 import os
+import re
 from datetime import datetime, timezone
 
 from django.db import transaction
@@ -41,6 +42,41 @@ APPLY = os.environ.get('QUALITY_APPLY', '') == '1'
 BACKUP_DIR = os.environ.get('AUDIT_BACKUP_DIR', '/data/audit')
 
 TIER_SCORE = {'S': 4, 'A': 3, 'B': 2, 'C': 1, 'D': 0}
+
+# Conservative identity guard: two names are treated as the same channel only
+# after provider prefixes, quality tokens and filler words are stripped.
+IDENTITY_PREFIX = re.compile(
+    r'^\s*(us|usa|at&t|att|prime|tv|go|rk|mx|uk|ca|4k|8k|vip|spectrum|bally|dazn)'
+    r'\s*(\([^)]*\))?\s*[:\-|]\s*', re.I)
+IDENTITY_QUALITY = re.compile(r'\b(hd|fhd|uhd|4k|8k|sd|raw|hevc|h|plus)\b', re.I)
+IDENTITY_FILLER = re.compile(r'\b(channel|network|television|tv|feed|stream)\b', re.I)
+
+
+def identity_core(name):
+    t = str(name or '').lower()
+    t = IDENTITY_PREFIX.sub('', t)
+    t = IDENTITY_FILLER.sub(' ', t)
+    t = IDENTITY_QUALITY.sub(' ', t)
+    return re.sub(r'[^a-z0-9]', '', t)
+
+
+def identity_region(name):
+    m = re.match(r'^\s*([A-Za-z]{2,4})\s*[:\-|]', str(name or ''))
+    return m.group(1).upper() if m else None
+
+
+def same_region(current_name, candidate_name):
+    cur = identity_region(current_name)
+    cand = identity_region(candidate_name)
+    if cur and cand:
+        return cur == cand
+    return True
+
+
+def same_identity(current_name, candidate_name):
+    cur = identity_core(current_name)
+    cand = identity_core(candidate_name)
+    return bool(cur and cand and cur == cand)
 
 
 def tier_score(value):
@@ -63,6 +99,10 @@ def best_candidate(channel_report):
         if not src.get('tier') or src.get('warnings'):
             continue
         if src.get('provider') == 'ZQAVO':
+            continue
+        if not same_identity(current.get('name'), src.get('name')):
+            continue
+        if not same_region(current.get('name'), src.get('name')):
             continue
         candidates.append(src)
     if not candidates:
