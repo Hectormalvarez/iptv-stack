@@ -11,9 +11,10 @@ Read these files at the start of any task in this repo, and update them at the e
 
 Rules:
 1. Never put credentials, tokens or passwords in the memory bank or any committed file.
-   Provider credentials live in the README's provider section only.
-2. `README.md` is the deep reference (root causes, exact commands, gotchas). The memory bank is
-   the index — point to README sections instead of duplicating them.
+   Provider credentials live in Dispatcharr's database only.
+2. `README.md` is the overview; `docs/reference.md` is the deep reference (root causes,
+   exact commands, gotchas). The memory bank is the index — point to reference sections
+   instead of duplicating them.
 3. When you fix something non-obvious, add it to `systemPatterns.md` and the decision log with
    the reason, not just the change.
 4. Keep `progress.md`'s "Pending" list accurate — it is the next-session todo.

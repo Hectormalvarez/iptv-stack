@@ -88,7 +88,7 @@ if [ "$MODE" = "apply" ]; then
     say ""
     say "  Next: on the TV, power-cycle or toggle CEC off/on so it re-reads the device."
     say "  Then test a remote button and check: grep -i cec /storage/.kodi/temp/kodi.log"
-    say "  If Vizio still ignores it, see the LE 12.2.x workarounds in README (delete the XML,"
+    say "  If Vizio still ignores it, see the LE 12.2.x workarounds in docs/reference.md (delete the XML,"
     say "  try the TV's HDMI 1 / eARC port)."
 fi
 

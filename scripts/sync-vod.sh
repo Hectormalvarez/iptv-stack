@@ -4,7 +4,7 @@
 # Why manual: the scheduled sync is deliberately OFF (the plugin config uses
 # SyncScheduleType=Manual). The sync fires thousands of player_api.php calls, and the
 # provider answers with an abuse block that 403s this host's IPv4 on *every* endpoint --
-# which also takes live TV down (see README *Provider egress*). Run it by hand, off-peak,
+# which also takes live TV down (see docs/reference.md *Provider egress*). Run it by hand, off-peak,
 # and keep an eye on how many calls it makes.
 #
 # Auth (credentials are never stored or committed) -- one of:

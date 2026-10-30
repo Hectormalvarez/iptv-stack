@@ -7,12 +7,12 @@
 - Dispatcharr **and Jellyfin** run with **`network_mode: host`** (2026-10-01): the provider
   front 403s this host's IPv4 on every endpoint but serves IPv6, and a bridge container has no
   IPv6 route. Jellyfin keeps `http://dispatcharr:9191/...` via `extra_hosts: dispatcharr=127.0.0.1`.
-  Only watchstate is left on `media-net`. See README *Provider egress*.
+  Only watchstate is left on `media-net`. See docs/reference.md *Provider egress*.
 
 ## The client
 - Boots **straight into the TV guide** (`lookandfeel.startupwindow = 10702`)
 - GUI runs at **3840x2160 @ 60 Hz** (`videoscreen.resolution = 26`); refresh switching *On start/stop*
-- Display values are `17 + index into `modetest -c`` — see README *Display and playback tuning*
+- Display values are `17 + index into `modetest -c`` — see docs/reference.md *Display and playback tuning*
 - `filecache.buffermode = 2` (HTTP finally cached), 64 MB, adaptive read factor
 - Remote: **Kore** (HTTP event server). No physical remote yet — the Vizio V505-H9 remote is
   **IR-only** (manual-verified), so **FLIRC USB (~$25) is the recommended path**; HDMI-CEC only via

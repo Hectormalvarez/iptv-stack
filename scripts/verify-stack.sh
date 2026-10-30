@@ -9,7 +9,7 @@
 # reports drift instead of letting it go unnoticed. Exit code is non-zero if anything FAILs.
 #
 # Kodi checks need key-based SSH (password auth is deliberately NOT baked in - SSH hardening on
-# the box is still outstanding, see README). Without KODI_HOST they are skipped.
+# the box is still outstanding, see docs/reference.md). Without KODI_HOST they are skipped.
 set -uo pipefail
 
 FAIL=0

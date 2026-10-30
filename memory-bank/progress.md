@@ -74,7 +74,7 @@
 - **The box is on `192.168.1.182` now** (`k5320.lan`; `.181` is dead). The DHCP drift is routine
   rather than an incident — resolve the hostname first, every session.
 - **Install an SSH key on the box — now the top priority.** Remote recovery is impossible without
-  it (this session needed a power cycle at the box, twice), and so is every README workflow that
+  it (this session needed a power cycle at the box, twice), and so is every docs/reference.md workflow that
   greps `/storage/.kodi/temp/kodi.log`.
 - **Do not use the `pvr.iptvsimple` addon toggle to force a playlist reload** — it wedges the player
   (see `systemPatterns.md`). Wait for the 10-min refresh timer instead.
@@ -102,11 +102,11 @@
   **open**, but `root@192.168.1.181` rejects both key and password auth from `usrv-01`, so
   JSON-RPC on 8080 (`-u kodi:kodi`) is still the only channel in. Forcing a playlist reload from
   outside remains impossible; a restart on the box (or the 10-min timer) is the only way. Still
-  worth installing an SSH key from LibreELEC settings — that would also make the README's
+  worth installing an SSH key from LibreELEC settings — that would also make the reference doc's
   log-based checks (`/storage/.kodi/temp/kodi.log`) usable from here.
 - **Kodi client IP drifts** (DHCP). If JSON-RPC stops answering, scan for the box rather than
   assuming it is down.
-- Confirm whether the client's IPTV Simple refresh interval is really 10 min: README's
+- Confirm whether the client's IPTV Simple refresh interval is really 10 min: reference doc's
   component table still says 51 min, `activeContext` says it was changed to 10.
 - **First VOD sync was still running at session end** (batch 1/2: 4,060 movies, 1,998 series);
   check `/XtreamLibrary/Progress` and that `VOD Movies`/`VOD Series` populate, then confirm
@@ -118,7 +118,7 @@
 - **Watchstate first-run** (browser: system user → Jellyfin backend two-way → webhook)
 - **Jellyfin user profiles** (kids/guest) — needs the current Jellyfin admin password
 - **FLIRC USB** for a real remote (Vizio V505-H9 remote is IR-only; CEC needs hardware and
-  LibreELEC 12.2 has a libCEC regression — see README *HDMI-CEC*)
+  LibreELEC 12.2 has a libCEC regression — see docs/reference.md *HDMI-CEC*)
 - **USB-C→Ethernet adapter** for the Latitude (removes Wi-Fi as a variable)
 - **Pin image versions** or add Watchtower (currently `:latest`)
 - **Extend the EPG remap** coverage further / consider a second curated profile for Jellyfin

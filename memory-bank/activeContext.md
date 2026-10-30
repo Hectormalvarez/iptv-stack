@@ -28,7 +28,7 @@
   **33,614 live streams in 725 categories**. `player_api.php` works but **`get.php` and `xmltv.php`
   both return 502** — fine for our purpose, because Dispatcharr imports XC accounts through the API
   and a failover source does not need its own EPG (the channel keeps its existing binding). This
-  matches the README's own note that `get.php` returns nothing to plain curl.
+  matches the reference doc's own note that `get.php` returns nothing to plain curl.
 - **Imported narrowly on purpose:** 13 `|US|` categories → **1,529 streams**, not all 725
   categories, per the API-abuse-block lesson. Gotcha found: the import only creates streams for
   **enabled** groups. With `auto_enable_new_groups_live=False` the first refresh returned

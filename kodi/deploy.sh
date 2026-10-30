@@ -8,7 +8,7 @@
 #   keymaps/livetv.xml   -> /storage/.kodi/userdata/keymaps/livetv.xml
 #
 # Everything else about the client (display mode, refresh switching, PVR settings, addon
-# settings) is applied through JSON-RPC / addon settings and documented in ../README.md.
+# settings) is applied through JSON-RPC / addon settings and documented in ../docs/reference.md.
 set -eu
 
 HOST="${1:-192.168.1.181}"

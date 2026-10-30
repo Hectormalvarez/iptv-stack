@@ -23,7 +23,7 @@ Two subscriptions, both consumed **only** through Dispatcharr:
 Credentials live in Dispatcharr's M3U accounts and in `.gitignore`d files — **never in git**,
 never in the memory bank. ZQAVO was added 2026-10-25 after STRONG8K took the whole stack down
 twice in one day (IPv4 403'd, then 502 on both families for hours). It is deliberately *not* a
-primary because it permits only **one** concurrent connection. See `README.md` → *Provider*
+primary because it permits only **one** concurrent connection. See `docs/reference.md` → *Provider*
 and `decisions.md` #27.
 
 Key constraints: everything must go through the Dispatcharr proxy (never `direct=true`), and

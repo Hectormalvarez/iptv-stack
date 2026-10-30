@@ -4,7 +4,7 @@
   Kodi reads keymaps at startup (and live for most contexts).
 
   Why this exists: this subscription has NO catchup/archive and timeshift is disabled
-  (see README), so Kodi's default left/right actions in live TV - StepBack/StepForward -
+  (see docs/reference.md), so Kodi's default left/right actions in live TV - StepBack/StepForward -
   do nothing useful. They are repurposed for channel zapping, like a set-top box.
 
   Everything else is left at Kodi's stock behaviour, which is already sensible:
