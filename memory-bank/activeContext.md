@@ -1,4 +1,25 @@
-# Active Context (2026-10-25)
+# Active Context (2026-10-28)
+
+## 2026-10-28 (Wed ~20:10 CDT): World Series Game 2 put on the Kodi box
+- **Request:** "help me get the world series to play on the kodi client" — mid-game
+  (Brewers at Rays, Tropicana Field, 7:00 PM CDT start on Fox).
+- **Path:** EPG title search (`ProgramData.title__icontains='world series'`) → resolve back
+  through `epg_id` → `Channel.epg_data_id` / `ChannelOverride.epg_data_id` intersected with the
+  Kodi profile membership → **#102 `US: FOX 7 HD [AUSTIN]`** was the only Fox affiliate in the
+  curated profile (3 sources). Verified the proxy feed first (2 consecutive 8 s probes, 12.5 MB
+  and 4.6 MB — the bytes-not-status-codes rule). Kodi was up and idle (`Player.GetActivePlayers
+  → []`, ping pong), so nothing was interrupted.
+- **Tuned:** `PVR.GetChannels` → label `FOX 7 HD [AUSTIN]` = **channelid 1307** →
+  `Player.Open {"item":{"channelid":1307}}` → OK. Verified: `live: true`, `speed: 1`,
+  `time 1:06:52 / 3:00:00` — **playing at the live edge, not a restart** (game clock matched wall
+  clock). Dispatcharr log: `Channel <uuid> ready, starting normal streaming`.
+- **No config changes were needed** — the channel was already in the profile with EPG bound.
+  Note the Austin Fox affiliate's EPG binding resolves to a *different* Fox station's guide entry
+  (`US: FOX 29`), which is how `remap-epg.py` matches; national Fox programmes still line up, so
+  guide shows the World Series correctly.
+- Gotchas hit: `ProgramData` joins via `.select_related('epg')` (not `epg_data`); `Channel.override`
+  raises `DoesNotExist` when absent — use the try/except helper; `Channel.channel_number` is
+  **not unique** (a lookup by number alone can return a different channel than the profile member).
 
 ## 2026-10-25 (Sun 17:50 CDT): second subscription wired in as cross-provider failover
 - **Request:** "i'm buying a sub to a new service" → "do it".
