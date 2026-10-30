@@ -43,6 +43,11 @@
 - **Stream-quality audit + ordered apply (2026-10-29)**: read-only audit script uses Dispatcharr's
   stream-specific proxy path with a single ffmpeg pass; core report generated from fresh Dispatcharr
   stats. Conservative apply promoted 4 clearly better sources (Eleven Sports, Tennis, MoviePlex,
+- **Repo published to GitHub (2026-10-30)**: pushed `main` only to the public repo
+  `Hectormalvarez/iptv-stack` via `gh`. The `refs/cline/checkpoints/*` refs (Watchstate DB, redis
+  dumps, logs) were kept local on purpose — never push with `--all`/`--mirror`. Full pre-publish
+  audit found no credentials in `main`'s tree or history.
+
   Big Ten Network), leaving event slots and ZQAVO untouched.
 
 ## Pending ⚠️
