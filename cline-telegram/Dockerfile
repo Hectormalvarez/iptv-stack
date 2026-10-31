@@ -4,8 +4,11 @@
 FROM node:24-slim
 
 # Slim images lack the CA bundle; Telegram and provider TLS need it.
+# jq is REQUIRED by the connector's --allowed-user-id hook (it pipes the
+# actor key through jq | grep -x to decide allow/deny — without jq every
+# message is denied as "unauthorized", even from the allowed user).
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates \
+    && apt-get install -y --no-install-recommends ca-certificates jq \
     && rm -rf /var/lib/apt/lists/*
 
 # Pin to the version validated on the host (3.0.74).
