@@ -1,5 +1,16 @@
 # System Patterns (the non-obvious things that cost real time to learn)
 
+## 2026-10-31 additions
+- **ZQAVO `max_connections: 1` cuts both ways.** Promoting a ZQAVO source to order-0 primary
+  (2026-10-31: `US-P| FOX Deportes HD` 1080p promoted onto #703 Fox Deportes over STRONG8K's
+  720p) consumes the provider's only connection while watched — ZQAVO failover is unavailable
+  elsewhere at that moment. Fine as a one-off quality upgrade; revert or accept it.
+- **Host shell has no docker CLI and no python3** — see `techContext.md` → *This workspace's
+  host*; use `scripts/doexec.js` (docker Engine API v1.52 over the unix socket).
+- Verified again: provider stream **names lie**; the only honest comparison is a short ffmpeg
+  probe through `/proxy/ts/stream/<hash>` (bytes, not status codes). ZQAVO `FOX Deportes HD`
+  was 1080p/8.5 Mbps while the identically-named STRONG8K primary was 720p/4.2 Mbps.
+
 ## Dispatcharr internals
 - **`ChannelOverride` is the only durable place for user edits.** Output resolves
   `Coalesce(override__epg_data, epg_data)` / `effective_name` / `effective_channel_group_obj`.
@@ -224,3 +235,41 @@
 - bulk imports from provider groups, re-homed into clean groups with number ranges
 - idempotent: adopts channels already in its groups; aborts if a run would shrink >10%
 - `SWEEP_NO_GUIDE` moves guide-less bulk channels to a trailing `No Guide` group (9001+)
+
+## Provider event streams (ZQAVO `:Nbc Sports NN` / `:Peacock Event NN`)
+- **These event streams arrive UNATTACHED — raw `Stream` rows with no channel.** They are
+  invisible to the channel list, the Kodi profile and every guide search; an agent asked to
+  "find live games" will find nothing even though the stream exists. Find them with
+  `Stream.objects.filter(name__iregex=r'@ Oct 3[12]|@ Nov ..')` — names carry the fixture and
+  start time (`Liga MX: Chivas vs Atlante @ Oct 31 8:30 PM :Nbc Sports  16`), and unlike the
+  NCAAF slots there is no stale channel name to mislead you.
+- **Wiring pattern (2026-10-31)**: the disabled-but-in-profile VIX PREMIUM DEPORTES slot
+  channels are the natural hosts — attach the event stream as `ChannelStream(order=0)`, demote
+  the generic filler to order=1, set a `ChannelOverride.name` with the fixture, flip
+  `hidden_from_output=False` and enable the profile membership. Done as a dry-run-first one-off;
+  a generic `wire-event-stream` script is a pending item.
+- **A pre-game probe returns 0 bytes — that is normal.** Event slots only serve video near the
+  listed start time; re-probe then (bytes-not-status-codes applies as always).
+- **EPG is no help for Liga MX**: the TUDN epg entries only list the `Liga MX en 60` highlights
+  loop; no live match rows exist in any guide source.
+
+## Cline ↔ Telegram bridge (`cline-telegram` container)
+- **jq must be in the image.** `--allowed-user-id` is enforced by a shell hook
+  (`jq -r .payload.actor.participantKey | grep -qx telegram:id:<id>`); without jq every message
+  is denied "unauthorized", *including the allowed user*. Silent — nothing in docker logs.
+- **`HOME` must point at the state volume.** The spawned connector child does not reliably
+  inherit `--config`/`--data-dir` flags; it resolves `~/.cline` from `$HOME`.
+- **Pin the hub port (`CLINE_HUB_PORT=25464`).** Host networking shares the host netns where
+  the host's own Cline Hub binds 25463 — without the override the bridge tries to "retire" the
+  HOST's hub. The `--rpc-address` flag does not reach the child; env vars do.
+- **Run the connector foreground (`-i`).** In background mode the parent spawns a detached
+  child and exits 0 — Docker kills the container (and child) and `restart: unless-stopped`
+  loops it forever.
+- **Clear stale connector/hub records at boot.** The state volume outlives the container, so
+  pid-bearing records (`data/connectors/telegram/*.json`, `data/locks/hub`) from a previous
+  boot make the parent exit with "connector already running".
+- **Device-code auth needs a one-shot run.** The background launcher times out after 15 s,
+  killing the device flow mid-handshake; run `cline auth cline` as a one-off container against
+  the same `/state` volume, approve the code in a browser once, and the token persists.
+- Read-only `~/.cline` can't be used directly (cline writes sessions/db/locks); the entrypoint
+  seeds a minimal copy (secrets.json, providers.json, settings, CA bundle) into `/state`.

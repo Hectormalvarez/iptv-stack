@@ -9,6 +9,7 @@ client configs, and the Python/shell automation that keeps it all curated and se
 |---|---|---|
 | Dispatcharr | http://localhost:9191 | M3U/EPG management, stream proxying, DVR |
 | Jellyfin | http://localhost:8096 | Media server, VOD libraries, Live TV tuner |
+| cline-telegram | — | Telegram ↔ AI-agent bridge: message @bot, get a headless Cline session over this repo |
 
 Both run with `network_mode: host` (provider blocks one address family; details in the
 reference) and share an Intel Iris Xe GPU via VAAPI at `/dev/dri`. Only `watchstate` sits

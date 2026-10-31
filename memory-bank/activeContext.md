@@ -1,4 +1,21 @@
-# Active Context (2026-10-28)
+# Active Context (2026-10-31)
+
+## 2026-10-31 (Sat): Telegram bridge live; Liga MX wired; Wisconsin-Iowa on
+- **Kodi tuned** to #25 Wisconsin @ Iowa (FOX 7 HD Austin, channelid 1307) via the standard
+  sequence — idle check, `Player.Open`, live-edge verification (`time 41:30`, `speed 1`).
+- **Cline ↔ Telegram bridge**: `cline-telegram` container (compose service) running
+  `cline connect telegram` as **@hectorsdevbot**, allowlisted to the user's Telegram id,
+  act mode, tools on, cwd=/workspace. Provider auth done once via one-shot `cline auth cline`
+  (device code) into the persisted `/state`. Six gotchas solved on the way — see
+  `systemPatterns.md` *Cline ↔ Telegram bridge* and `docs/reference.md`.
+- **Liga MX request from the phone exposed a stack blind spot**: ZQAVO event streams
+  (`Liga MX: Chivas vs Atlante @ Oct 31 8:30 PM :Nbc Sports 16`) arrive unattached — no
+  channel, no guide rows (TUDN epg only lists `Liga MX en 60`). Wired tonight's game onto
+  VIX slot ch #3192: event stream order=0, `ChannelOverride.name`='Liga MX: Chivas vs
+  Atlante - 7:30 PM CT', unhidden, membership enabled. Pre-game probe = 0 bytes (normal).
+  Background watcher (`/tmp/watch-ligamx.sh`, log `/tmp/ligamx-watch.log`) polling Kodi for
+  the channel to appear after playlist refresh.
+
 
 ## 2026-10-28 (Wed ~20:10 CDT): World Series Game 2 put on the Kodi box
 - **Request:** "help me get the world series to play on the kodi client" — mid-game

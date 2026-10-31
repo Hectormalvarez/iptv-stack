@@ -43,14 +43,30 @@
 - **Stream-quality audit + ordered apply (2026-10-29)**: read-only audit script uses Dispatcharr's
   stream-specific proxy path with a single ffmpeg pass; core report generated from fresh Dispatcharr
   stats. Conservative apply promoted 4 clearly better sources (Eleven Sports, Tennis, MoviePlex,
+  Big Ten Network), leaving event slots and ZQAVO untouched.
 - **Repo published to GitHub (2026-10-30)**: pushed `main` only to the public repo
   `Hectormalvarez/iptv-stack` via `gh`. The `refs/cline/checkpoints/*` refs (Watchstate DB, redis
   dumps, logs) were kept local on purpose — never push with `--all`/`--mirror`. Full pre-publish
   audit found no credentials in `main`'s tree or history.
-
-  Big Ten Network), leaving event slots and ZQAVO untouched.
+- **README restructured (2026-10-30)**: the 1,239-line log-style README split into a 97-line
+  overview + `docs/reference.md` (verbatim deep dive); ~15 cross-references re-pointed.
+- **Cline ↔ Telegram bridge live (2026-10-31)**: `cline-telegram` compose service runs
+  `cline connect telegram` (bot @hectorsdevbot, allowlisted to one Telegram user id) with
+  cwd=/workspace — the stack is now drivable/debuggable from a phone. Hard-won gotchas are in
+  docs/reference.md *Cline ↔ Telegram bridge* (jq in image, HOME at state volume, hub port
+  25464, foreground `-i`, stale-record cleanup, one-shot device auth).
+- **Liga MX event wiring (2026-10-31)**: ZQAVO's `:Nbc Sports NN` / `:Peacock Event NN` event
+  streams arrive UNATTACHED (raw `Stream` rows, no channel) — invisible to profile, Kodi and
+  guide searches. Tonight's Chivas vs Atlante (7:30 PM CT) wired onto VIX slot ch #3192
+  (event stream order=0, filler demoted, override name, unhidden, membership enabled).
 
 ## Pending ⚠️
+- **Re-probe the Liga MX Chivas vs Atlante stream near 7:30 PM CT kickoff** (2026-10-31) and
+  verify Kodi picked up channel #3192 (watcher log: `/tmp/ligamx-watch.log`); the pre-game
+  0-byte probe was normal.
+- **Generic `scripts/wire-event-stream.py`** (2026-10-31): the ZQAVO `:Nbc Sports NN`/
+  `:Peacock Event NN` wiring is a manual one-off; make it a dry-run-first script taking a
+  stream id/regex + slot channel (pattern recorded in docs/reference.md).
 - **Kodi SSH key still needs installing at the box** (2026-10-29): `root@k5320.lan` answers but
   rejects key auth. Remote recovery, skin activation and log-based checks remain blocked on this.
 - **Arctic Fuse 3 activation is still manual at the TV** (2026-10-29): installer now targets 3.4.13

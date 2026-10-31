@@ -1237,3 +1237,54 @@ from Dispatcharr's `tvg-chno`. Kore (HTTP event server) works as the remote; FLI
 the cheap "real remote" add-on — it presents as a keyboard, map your buttons once in the Flirc GUI,
 works everywhere including pre-boot navigation. See *HDMI-CEC* above for the TV-remote option.
 
+## Cline ↔ Telegram bridge (`cline-telegram`)
+
+Telegram messages to **@hectorsdevbot** become headless Cline sessions with the repo as
+workspace (act mode, tools on) — the stack can be driven, debugged and changed from a phone.
+Implementation is Cline CLI's first-party connector (`cline connect telegram`), wrapped in a
+small container (`cline-telegram/Dockerfile` + `entrypoint.sh`) rather than custom bot code.
+
+- **Config**: `.env` (gitignored) holds `TELEGRAM_BOT_TOKEN` + `TELEGRAM_USER_ID`; the bot
+  answers nobody else. Provider auth is seeded from the host's read-only `~/.cline` into the
+  writable `cline-telegram/state/` volume (also gitignored — it holds provider secrets).
+- **Auth (one-time per state volume)**: `docker run --rm --user 1000 -v
+  $PWD/cline-telegram/state:/state --entrypoint sh iptv-stack-cline-telegram -c 'cline
+  --config /state/.cline --data-dir /state/.cline/data auth cline'`, then approve the
+  device code at `authkit.cline.bot/device`. Do NOT try to auth through the connector itself —
+  its background launcher times out in 15 s and kills the handshake.
+- **Gotchas baked into the image/entrypoint** (all cost real debugging time — don't undo them):
+  1. `jq` must be installed — the `--allowed-user-id` allowlist is a `jq | grep -x` shell hook;
+     without jq *every* sender is denied "unauthorized", silently.
+  2. `HOME=/state` — the spawned connector child ignores `--config/--data-dir` and resolves
+     `~/.cline` from `$HOME`.
+  3. `CLINE_HUB_PORT=25464` — host networking shares the host netns where the host's own Cline
+     Hub owns 25463; without the override the bridge tries to **retire the host's hub**.
+  4. Foreground `-i` — background mode spawns a detached child and exits 0, which restart-loops
+     the container.
+  5. Stale connector/hub pid records in the state volume are cleared at every boot (a fresh
+     PID namespace makes them meaningless, but the parent trusts them and exits).
+- **Ops**: `docker compose logs -f cline-telegram`; restart with `docker compose restart
+  cline-telegram`; connector detail in `cline-telegram/state/.cline/data/logs/`.
+- Session commands from the phone: `/clear` (fresh session), `/tools`, `/cwd <path>`.
+
+## Provider event streams (ZQAVO `:Nbc Sports NN` / `:Peacock Event NN`)
+
+The failover provider ships per-fixture event streams (soccer, NBA, PL, boxing, …) whose names
+carry the fixture and start time — e.g. `Liga MX: Chivas vs Atlante @ Oct 31 8:30 PM
+:Nbc Sports  16`. They arrive as **raw `Stream` rows attached to no channel**, so they are
+invisible to the channel list, the Kodi profile and every guide search, and the EPG carries no
+corresponding programmes. To make one watchable:
+
+1. Find it: `Stream.objects.filter(name__iregex=r'@ Oct 3[12]|@ Nov ..')` (inside
+   `docker exec -i dispatcharr python manage.py shell`).
+2. Wire it onto a disabled VIX PREMIUM DEPORTES slot channel already in the Kodi profile:
+   attach as `ChannelStream(order=0)`, demote the filler stream, set `ChannelOverride.name`
+   to the fixture, `hidden_from_output=False`, enable the profile membership.
+3. Wait for Kodi's playlist refresh (10-min interval; watcher pattern in
+   `scripts/watch-kodi-wnba.sh`), then tune by name via `PVR.GetChannels` → `Player.Open`.
+
+A pre-game probe of the stream URL returns **0 bytes — normal**; event slots only serve video
+near the listed start time. A generic `scripts/wire-event-stream.py` to replace the manual
+one-off is on the pending list.
+
+
