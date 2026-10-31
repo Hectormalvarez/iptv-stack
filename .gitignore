@@ -4,6 +4,7 @@ jellyfin/
 recordings/
 .env
 .env.*
+!.env.example
 watchstate/data/
 __pycache__/
 # cline-telegram bridge: seeded with provider secrets + session state at runtime
