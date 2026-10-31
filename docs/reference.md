@@ -1287,4 +1287,10 @@ A pre-game probe of the stream URL returns **0 bytes — normal**; event slots o
 near the listed start time. A generic `scripts/wire-event-stream.py` to replace the manual
 one-off is on the pending list.
 
+Note on finding Liga MX (or any Mexican soccer) in the **guide**: matches are listed under the
+generic title `Live: Fútbol Mexicano Primera División` — no team names — so search by that
+phrase and time window, never by club. Also mind the timezone: CDMX is UTC-6 year-round
+(no DST since 2022), so while the US is still on daylight time (late Oct), a "7:05 pm hora
+del centro de México" kickoff is **8:05 PM in Austin**.
+
 

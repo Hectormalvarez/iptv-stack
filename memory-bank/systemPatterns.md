@@ -250,8 +250,12 @@
   a generic `wire-event-stream` script is a pending item.
 - **A pre-game probe returns 0 bytes — that is normal.** Event slots only serve video near the
   listed start time; re-probe then (bytes-not-status-codes applies as always).
-- **EPG is no help for Liga MX**: the TUDN epg entries only list the `Liga MX en 60` highlights
-  loop; no live match rows exist in any guide source.
+- **EPG carries Liga MX under GENERIC titles — team-name searches find nothing.** Matches are
+  listed as `Live: Fútbol Mexicano Primera División` (no teams, no league name in the title).
+  Search by that phrase plus the time window instead. 2026-10-31 example: the 8:00–10:00 PM CT
+  window (Monterrey vs Tijuana, 8:05 CT kickoff — note CDMX is UTC-6 year-round, so late-October
+  CDMX times are Austin CT + 1 h) appears on ~17 epg ids (TUDN family, Univision, Canal 5
+  locals); the TUDN `Liga MX en 60` rows are just the highlights loop.
 
 ## Cline ↔ Telegram bridge (`cline-telegram` container)
 - **jq must be in the image.** `--allowed-user-id` is enforced by a shell hook
