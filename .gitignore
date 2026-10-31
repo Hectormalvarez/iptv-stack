@@ -6,4 +6,6 @@ recordings/
 .env.*
 watchstate/data/
 __pycache__/
+# cline-telegram bridge: seeded with provider secrets + session state at runtime
+cline-telegram/state/
 
