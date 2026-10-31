@@ -88,6 +88,44 @@ services:
     networks:
       - media-net
 
+  # Cline <-> Telegram bridge: Telegram messages to the bot become headless
+  # Cline sessions with cwd=/workspace, so the stack can be driven (and
+  # debugged, and changed) from a phone. Token + allowed user id come from
+  # .env (gitignored). Provider auth is seeded from the host's ~/.cline
+  # (read-only mount) into the writable state volume — no key in any file.
+  # See cline-telegram/entrypoint.sh and docs/reference.md (Telegram bridge).
+  cline-telegram:
+    build: ./cline-telegram
+    image: iptv-stack-cline-telegram
+    container_name: cline-telegram
+    restart: unless-stopped
+    # Host networking: sessions reach Kodi at k5320.lan:8080 (mDNS name —
+    # bridge DNS cannot resolve .lan), Dispatcharr on :9191, and the LAN.
+    network_mode: host
+    # Match the image's `node` user to the host user that owns the repo.
+    user: "1000"
+    # Read-only host docker group, so sessions can `docker exec` into
+    # dispatcharr to run the repo's scripts (how they execute today).
+    group_add:
+      - "983"
+    env_file:
+      - .env
+    volumes:
+      # The repo, RW: sessions edit code, run scripts, and commit.
+      - .:/workspace
+      # Runtime state: seeded cline config (provider secrets) + sessions.
+      - ./cline-telegram/state:/state
+      # Host provider auth/model config, read-only; entrypoint seeds a copy.
+      - ${HOME}/.cline:/cline-config:ro
+      # Repo scripts run via docker exec into the dispatcharr container.
+      - /var/run/docker.sock:/var/run/docker.sock
+      # IPv4-first provider egress for provider probes during debug sessions
+      # (same reason as Dispatcharr; see config/gai.conf).
+      - ./config/gai.conf:/etc/gai.conf:ro
+    environment:
+      - TZ=America/Chicago
+    stop_grace_period: 30s
+
 networks:
   # Dispatcharr and Jellyfin now run on host networking; only watchstate is left here.
   media-net:
