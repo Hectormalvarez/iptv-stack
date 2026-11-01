@@ -229,6 +229,22 @@
   - Play the real feed, not a restart: check `Player.GetProperties` — the position must resume
     at the live edge (35m56s for a game that kicked off 36 min ago), not at 0.
 
+- **Kodi's PVR client does NOT retry a dead channel on `Player.Open` alone.** After the proxy
+  exhausts its failover rotation and gives up ("Failed to find alternative streams"), a plain
+  re-tune returns `OK` but connects nothing (no proxy activity). `Player.Stop` then `Player.Open`
+  forces a fresh client and channel init. Seen 2026-10-31 on the TUDN tune that collided with
+  the provider's hourly stream reset.
+- **Stream probes must run INSIDE the dispatcharr container.** The host has no ffmpeg —
+  `timeout 20 ffmpeg ...` fails with "failed to execute process" and every probe reads FAILED,
+  which looks exactly like a provider-wide outage. Probe via
+  `docker exec dispatcharr ffmpeg -i http://localhost:9191/proxy/ts/stream/<hash> ...`
+  (the audit script already does this correctly).
+- **A dead channel can be rescued live by attaching an extra source mid-incident.** ZQAVO's
+  `|US| TUDN ᴴᴰ` (stream 59575) was attached to VIP: TUDN (order=2) while the vovu sources
+  refused reconnects; the next rotation pass would have found it as an untried stream. In the
+  event the provider's own second URL recovered first — but the ZQAVO source stays as the
+  safety net.
+
 ## Curation model
 `build-kodi-profile.py` is the single source of truth for the client lineup:
 - explicit curated picks (`LINEUP` + `EVENTS`) — these are **exempt from the no-guide sweep**

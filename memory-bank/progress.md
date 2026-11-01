@@ -59,6 +59,10 @@
   streams arrive UNATTACHED (raw `Stream` rows, no channel) — invisible to profile, Kodi and
   guide searches. Tonight's Chivas vs Atlante (7:30 PM CT) wired onto VIX slot ch #3192
   (event stream order=0, filler demoted, override name, unhidden, membership enabled).
+- **Tijuana found + playing (2026-10-31)**: Monterrey vs Tijuana (8:05 PM CT, Canal 5/TUDN/ViX)
+  located via the generic guide title `Live: Fútbol Mexicano Primera División`; tuned to
+  VIP: TUDN. Mid-tune the provider's hourly stream reset killed both sources — recovered with
+  Stop+Open re-tune + ZQAVO TUDN attached as order=2 safety net (see systemPatterns).
 
 ## Pending ⚠️
 - **Re-probe the Liga MX Chivas vs Atlante stream near 7:30 PM CT kickoff** (2026-10-31) and
