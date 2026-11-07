@@ -35,6 +35,26 @@
   `Everton v Coventry @ Nov 6 ... :Nbc Sports 01` + generic `US-P| Premier League TV FHD`,
   unattached) — "switch to the other sub" has no exact equivalent for this game; PLTV wired onto
   #314 is the nearest fallback if STRONG8K truly dies.
+- **~10:50 AM resolution — it was never the box; it was BLACK VIDEO.** The user renewed STRONG8K
+  (panel Active to 2026-12-08; **`max_connections: 1`** now, was 3). One sync (`success`, 2,444
+  URLs updated, 15,828 streams) fixed normal channels instantly — a CNN JPEG snapshot showed real
+  decoded video — but the fixture's old event rows were tombstones: `Peacock 021` served a
+  **pure-black TS**, `STAN 44` was dead. **The sync renumbered the event slots**: new rows
+  `S 6599 US (Peacock 006)` and `S 7625 AU (STAN 12)` appeared; frame snapshots proved both live
+  at 64:54 (ARS 0-0). Wired 6599 as order 0, 7625 as order 1, pruned the two dead links →
+  **match confirmed on the TV at ~65'**. Postscript to the 10:20 entry: that "re-tune recovery"
+  only restored player *flags*; the feed had already gone black, and the app restart +
+  `System.Reboot` were chasing a phantom (HARMLESS but unnecessary — a reboot wasn't needed).
+- **Diagnostic that actually works:** pull one decoded JPEG frame through the proxy and *look* at
+  it (+fetch via the Engine-API archive endpoint). `-c copy -f null` counters prove packets, not
+  pictures; black slate ≈12 KB, real content 55-96 KB. **`VideoPlayer.HasVideo` is unreliable on
+  this build** — it read `false` while the user confirmed CNN was playing fine.
+- **EAGLE4K account created (id 4, 2026-11-07):** same line as ZQAVO on the live DNS
+  (`vpn-esxtrapro.pro`, expiry 2026-11-24, `max_connections: 1`); `ZQAVO`'s own `line.zqavo.top`
+  URL is connection-reset dead. Import stalls on the 33k-catalogue fetch (needs the
+  `timeout=300` xtream patch + a patient retry) — finish it and use it to REPLACE ZQAVO as the
+  failover account; `scripts/swap-provider.py` (census + strict matching, dry-run) is staged.
+
 
 ## 2026-10-31 (Sat): Telegram bridge live; Liga MX wired; Wisconsin-Iowa on
 - **Kodi tuned** to #25 Wisconsin @ Iowa (FOX 7 HD Austin, channelid 1307) via the standard

@@ -70,10 +70,18 @@
   activeContext.
 
 ## Pending ⚠️
-- **Post-MW10 cleanup of the EPL slot channel (2026-11-07):** after today's matches, re-hide
+- **Post-match cleanup of the EPL slot channel (2026-11-07):** after today's matches, re-hide
   #7812 (id 3935), disable its Kodi membership, clear the `ChannelOverride.name`, **and remove
-  the `ChannelStream(order=1)` AU STAN-44 failover added mid-match** — the next provider sync
-  may re-hide it on its own, but the override name and failover link linger until cleared.
+  the `ChannelStream` links to the MW10 feeds (`S 6599` Peacock 006, `S 7625` STAN 12)** — the
+  next provider sync may re-hide it on its own, but the override name and links linger.
+- **Finish the EAGLE4K account (id 4, 2026-11-07):** its first import stalls on the 33k-catalogue
+  XC fetch; retry the refresh (timeout patch applied) and, once ~1.5k streams land, decide its
+  role — likely REPLACE ZQAVO as the failover account (`line.zqavo.top` is connection-reset dead,
+  EAGLE4K points at the live `vpn-esxtrapro.pro` DNS) and disable the ZQAVO M3U account; re-point
+  or prune the 41 ZQAVO-wired `ChannelStream` links via `scripts/swap-provider.py` once its
+  apply/prune stage exists.
+- **Reapply the in-container XC timeout patch after any image update:**
+  `/app/core/xtream_codes.py:77` `timeout=60 → 300` (sed; survives restarts, not recreates).
 - **Re-probe the Liga MX Chivas vs Atlante stream near 7:30 PM CT kickoff** (2026-10-31) and
   verify Kodi picked up channel #3192 (watcher log: `/tmp/ligamx-watch.log`); the pre-game
   0-byte probe was normal.

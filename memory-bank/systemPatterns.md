@@ -28,6 +28,26 @@
   WoL out — see reference *Kodi access*). curl silence is NOT proof: a powered-off box looks
   identical to the 401-zero-length-body trap. Port-only scans misdirect — `ul5420` (.107/.142)
   answers 22+8080 with no JSON-RPC; require `JSONRPC.Ping → pong` specifically.
+- **Black video is a content state, not a client fault.** An expired/renewing provider serves a
+  pure-black TS with a normal-looking header (h264 1080p30; packet probes count "frames" fine).
+  Kodi then shows `spinner -> black` with `Player.Playing:true` — indistinguishable from a
+  decoder wedge. **Never reboot for it; snapshot the feed instead.**
+- **Content truth = one decoded JPEG pulled through the proxy and VIEWED.** Inside the container:
+  `ffmpeg -rw_timeout 8s -i <proxy url> -frames:v 1 -q:v 4 -y /tmp/x.jpg`, then fetch out via
+  the Engine API (`GET /v1.52/containers/<id>/archive?path=/tmp/x.jpg` → tar). Black slate ≈ 12 KB,
+  real 1080p content 55–96 KB. `-c copy -f null` proves packets, never pictures.
+- **`VideoPlayer.HasVideo` is unreliable on the 2026-11-07 build** — it read `false` while the
+  user confirmed good playback. Do not gate wedge diagnoses on it (or on `speed:1 live:true`,
+  which are consistent with black video too).
+- **Renewing a provider RENUMBERS its event slots.** Post-renewal sync on STRONG8K: 2,444 URLs
+  updated and the fixture identity moved (`Peacock 021 -> 006`, `AU STAN 44 -> 12`); the old slot
+  rows serve black/dead forever. Re-search fixtures by name after any renewal and verify with a
+  snapshot before wiring.
+- **In-container tweak: XC catalogue timeout.** `/app/core/xtream_codes.py:77`
+  `session.get(..., timeout=60)` stalls on a 33k-stream catalogue through Cloudflare → sed to
+  300. Survives container restarts, NOT image recreates — reapply after image updates.
+- **Renewed STRONG8K plan reports `max_connections: 1`** (was 3) — single concurrent stream per
+  the panel; box + Jellyfin viewing/recording will contend.
 
 ## Dispatcharr internals
 - **`ChannelOverride` is the only durable place for user edits.** Output resolves
