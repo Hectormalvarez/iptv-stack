@@ -1,4 +1,28 @@
-# Active Context (2026-10-31)
+# Active Context (2026-11-07)
+
+## 2026-11-07 (Sat ~10:00 CST): Arsenal v Hull City — from invisible Peacock slot to live TV
+- **Request:** "play the arsenal game on the kodi client" — EPL MW10, Arsenal v Hull City
+  (3:00 PM UK kickoff = 9:00 AM CT; live mid-match on request). US carriage is **Peacock-only**,
+  so the guide has **zero PL programmes today** — neither team-name nor "premier league"
+  programme searches find anything.
+- **Discovery path was the stream list, not the EPG:**
+  `US (Peacock 021) | Arsenal v. Hull City (2026-11-07 09:50:00)` (STRONG8K), the trailing
+  timestamp being **ET** (9:50 ET pre-show = 8:50 CT). Feed verified through
+  `/proxy/ts/stream/<hash>`: 1080p30, 12 s of frames.
+- **Wiring (ch #7812, id 3935, group `US| PEACOCK PPV ⱽᴵᴾ`):** STRONG8K slot *channels* ship
+  `hidden_from_output=True` + a **disabled** Kodi membership + a weeks-stale *channel* name
+  ("Away Feed: NYY at SD") while order=0 already holds the current fixture. Fix per decision
+  #30 pattern: enable membership → unhide → `ChannelOverride.name='EPL: Arsenal v Hull City -
+  9:00 AM CT'`. Order=0 re-verified unchanged after tuning (fixture-identity check).
+- **Box was OFF, not drifted:** full `/24` ARP inventory listed every live host and k5320 was
+  absent; `ul5420` (.107/.142) answered 8080 as ever (documented decoy). Wi-Fi box → WoL out —
+  **user powered it on**; it came back at **192.168.1.182**, boot-resumed on CNN (#3013),
+  which was the "it's not playing anything" state.
+- **Tuned minutes after boot:** the boot playlist load already included 7812 (M3U 1,680 ch) →
+  `PVR.GetChannels` → **channelid 5261** → `Player.Open` → live edge verified: joined at
+  `47:30/4:00:00`, `speed 1`, `live true`, then 47:54 → 48:04 over a 10 s wall clock.
+- **Process note:** the Dispatcharr wiring ran before plan mode was registered mid-session;
+  disclosed immediately, user approved continuing and switching off CNN consciously.
 
 ## 2026-10-31 (Sat): Telegram bridge live; Liga MX wired; Wisconsin-Iowa on
 - **Kodi tuned** to #25 Wisconsin @ Iowa (FOX 7 HD Austin, channelid 1307) via the standard

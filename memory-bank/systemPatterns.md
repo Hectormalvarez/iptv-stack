@@ -11,6 +11,24 @@
   probe through `/proxy/ts/stream/<hash>` (bytes, not status codes). ZQAVO `FOX Deportes HD`
   was 1080p/8.5 Mbps while the identically-named STRONG8K primary was 720p/4.2 Mbps.
 
+## 2026-11-07 additions
+- **STRONG8K "US (Peacock 0NN)" PPV slots are the twin of the ZQAVO unattached-stream trap.**
+  The slot *channels* exist (`US| PEACOCK PPV ⱽᴵᴾ`, numbers 779x–791x) with the live fixture
+  already attached at `order=0`, but ship `hidden_from_output=True` + a **disabled** Kodi
+  membership, and their channel *names are weeks stale* ("Away Feed: NYY at SD") — the truth
+  is only on the order-0 `Stream.name`. Wire per decision #30: enable membership → unhide →
+  fixture `ChannelOverride.name`. No EPG binding, so the guide stays empty until the name lands.
+- **A whole EPL matchweek can be Peacock-only = absent from every EPG.** Team-name and
+  "premier league" programme searches return nothing for the slate; discovery is the stream
+  list alone (`Stream.objects.filter(name__iregex="premier league|matchweek")`).
+- **US-sourced slot names carry ET timestamps** ("(2026-11-07 09:50:00)" = 8:50 CT pre-show);
+  cross-check the AU (STAN) twin naming the same fixture in AEDT before quoting kickoff times.
+- **"Box off" vs "IP drifted" vs "ul5420 decoy" — settle it with the ARP inventory**
+  (`nmap -sn 192.168.1.0/24`): a live-host list with no k5320 means powered off (Wi-Fi box,
+  WoL out — see reference *Kodi access*). curl silence is NOT proof: a powered-off box looks
+  identical to the 401-zero-length-body trap. Port-only scans misdirect — `ul5420` (.107/.142)
+  answers 22+8080 with no JSON-RPC; require `JSONRPC.Ping → pong` specifically.
+
 ## Dispatcharr internals
 - **`ChannelOverride` is the only durable place for user edits.** Output resolves
   `Coalesce(override__epg_data, epg_data)` / `effective_name` / `effective_channel_group_obj`.

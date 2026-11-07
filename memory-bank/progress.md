@@ -63,8 +63,16 @@
   located via the generic guide title `Live: Fútbol Mexicano Primera División`; tuned to
   VIP: TUDN. Mid-tune the provider's hourly stream reset killed both sources — recovered with
   Stop+Open re-tune + ZQAVO TUDN attached as order=2 safety net (see systemPatterns).
+- **Arsenal event-slot wired + playing (2026-11-07)**: STRONG8K `US (Peacock 021)` slot
+  ch #7812 (id 3935) unhidden, Kodi membership enabled, fixture override name set; feed
+  probed 1080p30 through the proxy; tuned **channelid 5261** at the live edge (`47:30/4:00`,
+  `speed 1`) minutes after the user powered the (previously off) box on. Full entry in
+  activeContext.
 
 ## Pending ⚠️
+- **Post-MW10 cleanup of the EPL slot channel (2026-11-07):** after today's matches, re-hide
+  #7812 (id 3935), disable its Kodi membership, and clear the `ChannelOverride.name` — the
+  next provider sync may re-hide it on its own, but the override name lingers until cleared.
 - **Re-probe the Liga MX Chivas vs Atlante stream near 7:30 PM CT kickoff** (2026-10-31) and
   verify Kodi picked up channel #3192 (watcher log: `/tmp/ligamx-watch.log`); the pre-game
   0-byte probe was normal.
