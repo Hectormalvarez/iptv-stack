@@ -42,7 +42,8 @@ Apply (re-order primaries, remove the old provider's links):
 """
 
 import os
-from collections import Counter
+import re
+from collections import Counter, defaultdict
 
 from apps.channels.models import (Channel, ChannelProfile, ChannelProfileMembership,
                                   ChannelStream)
@@ -54,6 +55,42 @@ FROM_ACCOUNT = os.environ.get('FROM_ACCOUNT', 'STRONG8K')
 FALLBACK_ACCOUNT = os.environ.get('FALLBACK_ACCOUNT', 'ZQAVO')
 APPLY = os.environ.get('SWAP_APPLY', '') == '1'
 PRUNE_OLD = os.environ.get('PRUNE_OLD', '1') == '1'
+
+# Same normalisation as add-backup-streams.py: two names are the same channel
+# only when their cores agree after prefixes / filler / quality tokens drop out.
+PREFIX = re.compile(
+    r'^\s*(us|usa|at&t|att|prime|tv|go|rk|mx|uk|ca|4k|8k|vip|spectrum|bally|dazn)'
+    r'\s*(\([^)]*\))?\s*[:\-|]\s*', re.I)
+QUALITY = re.compile(r'\b(hd|fhd|uhd|4k|8k|sd|raw|hevc|h|plus)\b', re.I)
+FILLER = re.compile(r'\b(channel|network|television|tv|feed|stream)\b', re.I)
+
+# Rotating per-fixture slots ("NFL  | 02 - 1pm Steelers at Saints") must never
+# be matched against a stable network channel - a wrong feed is worse than none.
+EVENT_SLOT_RE = re.compile(
+    r'^\s*(NFL|NBA|MLB|NHL|NCAAF|NCAAB|SOCCER|UFC|WWE|BOXING|GOLF|TENNIS)'
+    r'\s*\|?\s*\d+\s*[-:]', re.I)
+
+
+def core(name):
+    """Reduce a stream/channel name to a comparable core token."""
+    t = str(name or '').lower()
+    t = PREFIX.sub('', t)
+    t = FILLER.sub(' ', t)
+    t = QUALITY.sub(' ', t)
+    return re.sub(r'[^a-z0-9]', '', t)
+
+
+def is_event_slot(name):
+    return bool(EVENT_SLOT_RE.match(str(name or '')))
+
+
+def effective_name(ch):
+    """The name clients see: an override wins, else the channel's own name."""
+    try:
+        ov = ch.override
+    except Exception:
+        ov = None
+    return (ov.name if ov and ov.name else ch.name)
 
 
 def account_of(link):
@@ -87,10 +124,82 @@ def main():
               % NEW_PRIMARY)
         return
     pool = list(acct.streams.all())
+    if not pool:
+        print('\npool is empty - enable this account\'s M3U groups, then refresh')
+        return
     print('\nnew primary %r (id=%s): %d streams available, max_streams=%s'
           % (acct.name, acct.id, len(pool), acct.max_streams))
 
-    print('\nstage 1 (census + account check) only - matching/apply lands next.')
+    by_core = defaultdict(list)
+    for s in pool:
+        k = core(s.name)
+        if k:
+            by_core[k].append(s)
+
+    already, slots_skipped = 0, 0
+    planned, ambiguous, unmatched = [], [], []
+    per_group = defaultdict(lambda: [0, 0])   # group -> [matched, to-swap]
+    for ch in channels:
+        links = sorted(ch.channelstream_set.all(), key=lambda x: x.order)
+        if links and account_of(links[0]) == NEW_PRIMARY:
+            already += 1
+            continue
+        g = ch.channel_group.name if ch.channel_group else '(none)'
+        per_group[g][1] += 1
+        src_name = links[0].stream.name if links else ch.name
+        if is_event_slot(src_name):
+            slots_skipped += 1
+            continue
+        cands = []
+        for k in (core(ch.name), core(effective_name(ch))):
+            if k and by_core.get(k):
+                cands = by_core[k]
+                break
+        if not cands:
+            unmatched.append(ch)
+            continue
+        uniq = {s.id: s for s in cands}
+        if len(uniq) > 1:
+            ambiguous.append((ch, list(uniq.values())[:3]))
+            continue
+        planned.append((ch, cands[0]))
+        per_group[g][0] += 1
+
+    print('\n== stage 2: matching (dry run only - apply lands in a later commit) ==')
+    print('already on %-10s: %d' % (NEW_PRIMARY, already))
+    print('event slots skipped : %d' % slots_skipped)
+    print('matched             : %d' % len(planned))
+    print('ambiguous (skipped) : %d' % len(ambiguous))
+    print('unmatched           : %d' % len(unmatched))
+
+    print('\n== samples (channel | current primary -> new primary) ==')
+    for ch, s in planned[:15]:
+        links = sorted(ch.channelstream_set.all(), key=lambda x: x.order)
+        cur = links[0].stream.name if links else '(none)'
+        print('   #%-6s %-26s %-24s -> %s'
+              % (int(ch.channel_number or 0), (ch.name or '')[:26],
+                 str(cur)[:24], str(s.name)[:32]))
+
+    if ambiguous:
+        print('\n== ambiguous (need MATCH_OVERRIDES or a rename) - first 8 ==')
+        for ch, cands in ambiguous[:8]:
+            print('   #%-6s %-32s cands: %s'
+                  % (int(ch.channel_number or 0), (ch.name or '')[:32],
+                     [str(c.name)[:24] for c in cands]))
+    if unmatched:
+        print('\n== unmatched (first 20 of %d) ==' % len(unmatched))
+        for ch in unmatched[:20]:
+            print('   #%-6s %-36s %s'
+                  % (int(ch.channel_number or 0), (ch.name or '')[:36],
+                     (ch.channel_group.name if ch.channel_group else '')))
+
+    print('\n== per-group coverage (matched / to-swap) ==')
+    for g in sorted(per_group):
+        m, t = per_group[g]
+        if t:
+            print('   %-36s %4d / %4d' % (g, m, t))
+
+    print('\nDRY RUN - nothing written. Apply/prune stage not implemented yet.')
 
 
 main()
