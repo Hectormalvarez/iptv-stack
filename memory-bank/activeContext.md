@@ -1,5 +1,25 @@
 # Active Context (2026-11-07)
 
+## 2026-11-07 (Sat ~10:45 CST): "Put ESPN on" — the movie was a dead guide binding, not the feed
+- **Request:** "put espn thats going to show the texas game on". Slate (EPG description search, not
+  team names): **No. 7 Texas Longhorns at No. 18 Missouri, 11:00 AM–2:00 PM CT, ESPN** — plus
+  Texas A&M at South Carolina 2:00 PM and Texas Tech v West Virginia 8:30 PM, also ESPN.
+- **Two ESPN feeds, one working guide:** #301 `US: ESPN HD` (Dispatcharr id 2087, Kodi
+  **channelid 1595**, 3 sources) was bound to **dead `EPGData 1200`** (STRONG8K `US: ESPN USA HD`,
+  40 rows, 0 upcoming) → the guide showed *nothing*, which reads exactly like "ESPN isn't carrying
+  it". The live `EPGData 8716` (`ESPN HD`, EPGSHARE-US2, 5 rows in 8 h) was attached only to the
+  VIP twin #1552 `VIP: ESPN` (id 14149, channelid **4001**).
+- **Tuned #301** (`Player.Open {channelid:1595}`) → `speed:1 live:true`; content proved with a
+  snapshot: **College GameDay**, ESPN bug + ticker, **1280x720** (ESPN's native format), 160 KB JPEG.
+- **Fix:** `ChannelOverride.epg_data = EPGData 8716` on ch 2087 (decision #33, pattern #6/#14).
+  Dispatcharr logged `EPG data changed (None -> 8716)` + `Triggering EPG program refresh for
+  ESPN.HD.us2`; `/output/epg/Kodi` now carries `channel="301"` 17:00–20:00 UTC = *"Live: College
+  Football — The No. 7 Texas Longhorns (6-2) visit the No. 18 Missouri Tigers"*. The TV guide picks
+  it up on IPTV Simple's next refresh; playback never needed it.
+- **Probe gotcha (new):** with the box holding the provider's single upstream connection, the
+  stream-specific path timed out and `-frames:v 1` on the channel UUID produced
+  `non-existing PPS/no frame!` → a 148-byte JPEG. `-t 12 -c copy` to a file, then decode, worked.
+
 ## 2026-11-07 (Sat ~10:00 CST): Arsenal v Hull City — from invisible Peacock slot to live TV
 - **Request:** "play the arsenal game on the kodi client" — EPL MW10, Arsenal v Hull City
   (3:00 PM UK kickoff = 9:00 AM CT; live mid-match on request). US carriage is **Peacock-only**,

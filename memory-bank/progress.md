@@ -1,6 +1,10 @@
 # Progress
 
 ## Done and verified ✅
+- **ESPN guide restored + game on air (2026-11-07)**: #301 `US: ESPN HD` was guide-less because it
+  was bound to the provider's dead `US: ESPN USA HD` entry; re-bound to the live EPGSHARE `ESPN HD`
+  entry via `ChannelOverride` (decision #33), snapshot-verified the feed (720p ESPN College GameDay)
+  and tuned the Texas–Missouri game on Kodi channelid 1595.
 - **Stack**: Dispatcharr + Jellyfin + Watchstate on compose, TZ=America/Chicago, healthchecks,
   GPU passthrough, DVR volume → `/mnt/storage/recordings`, nightly off-box backups
 - **Provider integration**: proxied output only (UA pinned), `max_streams=2`, EPG matched
@@ -70,6 +74,12 @@
   activeContext.
 
 ## Pending ⚠️
+- **Same dead-EPG rot on the ESPN siblings (2026-11-07):** #304 `US: ESPN USA HD` (id 2086) and
+  #2401 `NCAAF 03: ESPNU` (id 4628) are still bound to `EPGData 1200` (0 upcoming programmes), so
+  their guide is blank exactly like #301 was before the 8716 re-binding. #304 needs a decision on
+  which entry is genuinely "ESPN USA"; #2401 should follow #2055 `US: ESPN U HD` → `EPGData 8506`
+  (`ESPNU HD`). Also worth a sweep for every *visible* channel whose effective EPG has zero future
+  programmes but a same-named sibling that has them.
 - **Post-match cleanup of the EPL slot channel (2026-11-07):** after today's matches, re-hide
   #7812 (id 3935), disable its Kodi membership, clear the `ChannelOverride.name`, **and remove
   the `ChannelStream` links to the MW10 feeds (`S 6599` Peacock 006, `S 7625` STAN 12)** — the
