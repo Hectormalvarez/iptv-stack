@@ -23,6 +23,18 @@
   `47:30/4:00:00`, `speed 1`, `live true`, then 47:54 → 48:04 over a 10 s wall clock.
 - **Process note:** the Dispatcharr wiring ran before plan mode was registered mid-session;
   disclosed immediately, user approved continuing and switching off CNN consciously.
+- **~10:20 AM CT: "its not playing" — hourly reset, not sub expiry.** The picture froze
+  ~60–70 min into the stream while Kodi's player kept reporting `speed:1` on a dead session;
+  STRONG8K's `M3UAccount.status=error` is sync-level only — fresh proxy probes pulled clean
+  1080p30 frames from the Arsenal feed *and* an unrelated channel seconds later.
+  **`Player.Stop` + fresh `Player.Open` re-tuned instantly** (live edge 54:05 → 54:31 rolling).
+  Symptom of the same churn: ESPN #301's order-0 hash 404'd on the proxy at that moment.
+- **Hardened the slot + ZQAVO reality check:** attached the same-fixture AU twin
+  (`S 7694 AU (STAN 44) | Arsenal v Hull City`, probed healthy first) as `order=1` failover on
+  #7812 — the standard anti-single-source fix. **ZQAVO has no Arsenal v Hull row today** (only
+  `Everton v Coventry @ Nov 6 ... :Nbc Sports 01` + generic `US-P| Premier League TV FHD`,
+  unattached) — "switch to the other sub" has no exact equivalent for this game; PLTV wired onto
+  #314 is the nearest fallback if STRONG8K truly dies.
 
 ## 2026-10-31 (Sat): Telegram bridge live; Liga MX wired; Wisconsin-Iowa on
 - **Kodi tuned** to #25 Wisconsin @ Iowa (FOX 7 HD Austin, channelid 1307) via the standard

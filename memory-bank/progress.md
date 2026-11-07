@@ -71,8 +71,9 @@
 
 ## Pending ⚠️
 - **Post-MW10 cleanup of the EPL slot channel (2026-11-07):** after today's matches, re-hide
-  #7812 (id 3935), disable its Kodi membership, and clear the `ChannelOverride.name` — the
-  next provider sync may re-hide it on its own, but the override name lingers until cleared.
+  #7812 (id 3935), disable its Kodi membership, clear the `ChannelOverride.name`, **and remove
+  the `ChannelStream(order=1)` AU STAN-44 failover added mid-match** — the next provider sync
+  may re-hide it on its own, but the override name and failover link linger until cleared.
 - **Re-probe the Liga MX Chivas vs Atlante stream near 7:30 PM CT kickoff** (2026-10-31) and
   verify Kodi picked up channel #3192 (watcher log: `/tmp/ligamx-watch.log`); the pre-game
   0-byte probe was normal.
