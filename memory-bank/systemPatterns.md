@@ -48,6 +48,23 @@
   300. Survives container restarts, NOT image recreates — reapply after image updates.
 - **Renewed STRONG8K plan reports `max_connections: 1`** (was 3) — single concurrent stream per
   the panel; box + Jellyfin viewing/recording will contend.
+- **An empty guide on a perfectly healthy channel is an EPG *binding* bug, not a provider fault.**
+  #301 `US: ESPN HD` was bound to `EPGData 1200` (STRONG8K `US: ESPN USA HD`: 40 rows, **0
+  upcoming**) while the live ESPN schedule sat in `EPGData 8716` (`ESPN HD`, EPGSHARE-US2) on the
+  VIP twin #1552. Stream probed fine; the guide was simply blank — which reads exactly like "this
+  network isn't carrying the game". Re-binding `ChannelOverride.epg_data` fixed it in one write
+  (Dispatcharr logs `EPG data changed` → invalidates the XMLTV cache → re-harvests that entry).
+  Check the *sibling* channels before blaming the feed: the same rot is still on #304
+  `US: ESPN USA HD` and #2401 `NCAAF 03: ESPNU`.
+- **In the output EPG the key is the channel *number*, not the EPG name.** `/output/m3u/Kodi`
+  emits `tvg-id="301"` and `/output/epg/Kodi` matches `channel="301"`, so grepping the xmltv for
+  `ESPN.HD.us2` finds nothing and looks like the binding failed. Verify with
+  `grep 'channel="301"'` (programme elements span lines — `<title>` is on the next one).
+- **A second client joining a channel the box is already watching often cannot decode.**
+  `ffmpeg -frames:v 1` on the stream-specific path timed out (`Connection timed out`), and on the
+  channel-uuid path emitted `non-existing PPS 0` / `no frame!` and wrote a 148-byte JPEG. Capture
+  first, decode second: `ffmpeg -t 12 -c copy -y /tmp/cap.ts` then `ffmpeg -i /tmp/cap.ts
+  -frames:v 1` gave a clean 1280x720 frame. Mid-GOP joins need the buffer, not a single frame.
 
 ## Dispatcharr internals
 - **`ChannelOverride` is the only durable place for user edits.** Output resolves
