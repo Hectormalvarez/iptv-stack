@@ -1,3 +1,8 @@
+> **Legacy — do not extend.** This is the session-era deep dive from the pre-rewrite codebase,
+> kept as the operational runbook until Phase 5. Its durable facts are being lifted into
+> [`invariants.md`](invariants.md); current documentation starts at [`README.md`](README.md).
+> Frozen at tag `legacy/pre-rewrite-2026-11-07`.
+
 # iptv-stack
 
 IPTV → Jellyfin media server.
