@@ -1,20 +1,48 @@
-# Memory Bank
+# Repo workflow
 
-Read these files at the start of any task in this repo, and update them at the end:
+## Read first, every task
 
-- `memory-bank/projectbrief.md` — what the stack is, components, provider constraints
-- `memory-bank/techContext.md` — versions, hosts, repo layout, cron, access
-- `memory-bank/systemPatterns.md` — Dispatcharr internals and Kodi gotchas (the expensive lessons)
-- `memory-bank/activeContext.md` — current state and recent work
-- `memory-bank/progress.md` — done vs pending
-- `memory-bank/decisions.md` — decision log with rationale
+1. `docs/plan.md` — the phase we are in and its exit gate.
+2. `docs/invariants.md` — provider / EPG / client facts that break the stack when ignored.
+3. The ADR behind whatever you are about to touch (`adr/`).
 
-Rules:
-1. Never put credentials, tokens or passwords in the memory bank or any committed file.
-   Provider credentials live in Dispatcharr's database only.
-2. `README.md` is the overview; `docs/reference.md` is the deep reference (root causes,
-   exact commands, gotchas). The memory bank is the index — point to reference sections
-   instead of duplicating them.
-3. When you fix something non-obvious, add it to `systemPatterns.md` and the decision log with
-   the reason, not just the change.
-4. Keep `progress.md`'s "Pending" list accurate — it is the next-session todo.
+`docs/reference.md` and `memory-bank/` are **legacy** (pre-rewrite). Read them as an operational
+runbook only. Do not extend them, and do not add session logs anywhere in this repo.
+
+## Where code belongs
+
+| Job | Home |
+|---|---|
+| Dispatcharr can already do it | Dispatcharr config, UI or REST API |
+| Generic mechanics (name matching, EPG janitor, probing) | an official store plugin |
+| Policy that is ours (curated lineup, EPG binding, event slots) | `dispatcharr-plugins/kodi-lineup/` |
+| Physically host-only (VOD sync trigger, container health) | `ops/` |
+| — | **never** `docker exec … manage.py shell < script.py` |
+
+## Rules
+
+1. **No credentials, tokens or passwords in any file.** Provider credentials live in Dispatcharr's
+   database only.
+2. One fact, one place: link to it, don't copy it.
+3. Any claim about provider or platform behaviour carries its proof — the command, or `file:line`.
+4. A new decision is a new ADR. Progress is updated in `docs/plan.md`, never in a session log.
+5. Writes go to **`ChannelOverride`**, never `Channel` (invariants #5).
+6. Never promote an event slot to `order=0` (invariants #7).
+
+## Commits & verification
+
+- Conventional commits: `feat|fix|refactor|test|docs|chore(scope): summary`.
+- Small, buildable steps; stage files explicitly (`git add path/to/file`), not `git add .`.
+- Before committing, run the project's fast check plus the gate for the current phase:
+  `pytest -q`, and `./scripts/verify-stack.sh` while it still exists. Do not commit on a failure.
+- Never `git push --force`, `git reset --hard`, `rm -rf` or `DROP TABLE` without explicit
+  confirmation.
+
+## Environment
+
+- Host has `docker`, `node`, `python3` (pyenv) and `sqlite3`. **No `.venv/` in this repo** — if one
+  is ever created, prefix Python commands with `.venv/bin/` from then on.
+- Containers: `dispatcharr` (host net, :9191), `jellyfin` (host net, :8096), `cline-telegram`.
+- Kodi box: `k5320.lan` → **192.168.1.182** (DHCP — re-resolve each session), JSON-RPC on :8080 as
+  `kodi:kodi`.
+
