@@ -48,6 +48,27 @@
   300. Survives container restarts, NOT image recreates — reapply after image updates.
 - **Renewed STRONG8K plan reports `max_connections: 1`** (was 3) — single concurrent stream per
   the panel; box + Jellyfin viewing/recording will contend.
+- **Pre-event slot feeds LOOK live unless you VIEW the frame.** 2026-11-07 was an NFL off-day
+  (whole slate incl. London CIN@ATL was Sunday Nov 8 — corroborated by plaintextsports' dated
+  scoreboard and RedZone showing its standby card). That hour: STRONG8K slots `NFL | 03/04/07`
+  served an identical black trickle (289,332 B TS / 12,461 B JPEG) while ZQAVO twins of the SAME
+  slots returned 3.9–4.0 MB TS / ~90 KB JPEG that decoded to a bright **"NO LIVE EVENT FOR THE
+  MOMENT"** NFL card. Byte size alone said "live"; the picture said placeholder. **The 12 KB-black
+  vs 55–96 KB-real size bands overlap placeholder cards — extract the JPEG via the Engine API and
+  view it before calling any feed live.** STRONG8K network feeds were genuinely live that hour
+  (ESPN #301: Texas A&M @ South Carolina pre-game, 8.5 MB).
+- **Intl-channel EPG bindings lie as often as stream names.** Same hour, EPG vs actual frame:
+  beIN #308 listed "Ligue 1 from Parc des Princes" but showed a Premier Padel (Coello–Tapia)
+  ceremony; `AF: CANAL+ SPORT` listed Valencia–Real Madrid but showed the PGA Los Cabos broadcast;
+  `VIX: LO MEJOR DE LIGA MX` listed LaLiga but showed a ViX comedy promo. Meanwhile named-matchup
+  EPGs on real networks held up (Telemundo's "Roma vs Sassuolo" → frame showed ROM 2-0 SAS 57').
+  Rule: named-matchup descriptions on network channels are trustworthy; generic "Live: X" rows and
+  intl-channel bindings are not — verify anything you intend to claim.
+- **Slot-timestamp timezone math: US slot names are ET → UTC = +5 h (CST is UTC−6 after DST);
+  `AU (STAN…)`/AEDT names → UTC = −11 h.** Getting the sign backwards drops the whole US
+  afternoon window from a census and drags tomorrow-morning ET rows into "tonight".
+- **EAGLE4K now exists as M3U account id 4 with 0 streams** (staged swap beneficiary per decision
+  #32) — account created but not synced as of 2026-11-07.
 - **An empty guide on a perfectly healthy channel is an EPG *binding* bug, not a provider fault.**
   #301 `US: ESPN HD` was bound to `EPGData 1200` (STRONG8K `US: ESPN USA HD`: 40 rows, **0
   upcoming**) while the live ESPN schedule sat in `EPGData 8716` (`ESPN HD`, EPGSHARE-US2) on the

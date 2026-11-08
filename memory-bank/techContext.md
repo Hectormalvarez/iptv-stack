@@ -48,3 +48,10 @@ scripts/install-arctic-fuse3.sh AF3 skin side-by-side installer
 ## Kodi access
 `ssh root@192.168.1.181` (password known to the user, not stored here).
 JSON-RPC: `http://192.168.1.181:8080/jsonrpc`, user `kodi`/`kodi`.
+
+## This workspace's host
+`usrv-01` — but there is **no docker CLI and no python3** in the shell here (only `node`).
+To run things in containers use `scripts/doexec.js` (talks to `/var/run/docker.sock`
+via the Engine API v1.52):
+`node scripts/doexec.js dispatcharr python manage.py shell -c '<django snippet>'`
+It demuxes the docker exec stream, so stdout of the inner command comes back verbatim.

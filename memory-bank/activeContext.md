@@ -1,5 +1,30 @@
 # Active Context (2026-11-07)
 
+## 2026-11-07 (Sat ~15:05 CST): live-stream census — "what's available live right now"
+- **Request:** "check what's available live right now on the streams". Read-only census + short
+  ffmpeg probes; nothing wired, nothing tuned.
+- **CORRECTED after viewing the frames (byte-size verdicts were wrong):** ESPN #301 = Texas A&M @
+  South Carolina pre-game/kickoff graphic — genuinely live. RedZone #325 = NFL RedZone standby
+  card (no NFL today; the whole slate incl. London CIN@ATL is Sunday Nov 8). ZQAVO NFL slot twins
+  = "NO LIVE EVENT FOR THE MOMENT" placeholder, not live games; STRONG8K slots = black trickle.
+  Genuinely live ball: FA Cup **Peterborough 0-3 Reading** (45+4', Stan feed on `AU (STAN 22)`),
+  rugby **France 19-3 Fiji** (~35') on `AU (STAN 23)`, NCAAM season-openers on `:NCAAB` slots.
+- **Hidden-slot inventory tonight (all `hidden_from_output=True`, no EPG):** Peacock Miami vs Notre
+  Dame 5:30 CT (ch 7801), Michigan State vs Michigan 5:30 CT (7802), Maryland vs Georgetown 6:00 CT
+  (7803); NBA slate 4:00–9:00 CT (`:NBA 01–07` slots); UFC Fight Night Paris prelims 5:55 CT / main
+  Cortes Acosta–Walker 8:55 CT (ch 6445/6449); NHL 7:00–9:30 CT slate (ch 7209–7219); ATP Paris
+  Ruud v Alcaraz 4:00 CT (`:Tennis 10`). None are wired/enabled — wiring is per decision #30/#31.
+- **EAGLE4K** (account id 4) exists with **0 streams** — created, not synced.
+- EPG on-air-now sweep of 450 bound channels ran clean (745 rows). RedZone's EPG row
+  ("Every Sunday Afternoon 13:00–21:00") was closer to the truth than my byte-size read — with
+  zero NFL games on Saturday the feed only shows its standby card. Neither EPG text nor JPEG size
+  decides "live"; the decoded, *viewed* frame does.
+- ~15:00 CT follow-up sweep (all groups incl. Mexico/VIP): **frame-verified live** = ESPN #301
+  (A&M–SC), Telemundo #702 (Serie A Roma 2-0 Sassuolo 57'), Golf Channel #331 (WWTC Los Cabos R3,
+  Ben James -18 thru 11 — also seen on the Canal+ Sport PL feed), FA Cup + France–Fiji slots.
+  EPG-vs-frame lies caught: beIN #308 (padel, not Ligue 1), #2706 (golf, not LaLiga), #845 (ViX
+  promo, not LaLiga) — Valencia–Real Madrid unconfirmed everywhere probed.
+
 ## 2026-11-07 (Sat ~10:45 CST): "Put ESPN on" — the movie was a dead guide binding, not the feed
 - **Request:** "put espn thats going to show the texas game on". Slate (EPG description search, not
   team names): **No. 7 Texas Longhorns at No. 18 Missouri, 11:00 AM–2:00 PM CT, ESPN** — plus

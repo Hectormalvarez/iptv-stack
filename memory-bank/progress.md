@@ -114,6 +114,10 @@
   works, which is all the import needs. Harmless while it is failover-only, but promoting it to a
   primary would need a working EPG path, and `max_connections: 1` means it can never serve two
   channels at once.
+- **Nothing to recheck on STRONG8K NFL slots.** The 2026-11-07 "black slots mid-game" scare was a
+  misread: Saturday had **no NFL games at all** (slate = Sunday Nov 8; RedZone showed its standby
+  card, ZQAVO twins showed a "NO LIVE EVENT FOR THE MOMENT" card). Lesson in systemPatterns: view
+  the decoded frame, never trust byte sizes alone.
 - **#104 ABC 13 (KTRK Houston) is single-source.** It carried Ole Miss at Texas on 2026-10-24 and is
   the only usable ABC feed in the profile, so any ABC game still dies at the provider's hourly reset
   (`add-backup-streams.py` hardened 475 channels but not this one). Duplicate candidates spotted:
