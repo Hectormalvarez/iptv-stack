@@ -1,5 +1,11 @@
 # iptv-stack
 
+> **Rewrite in progress.** The automation is being rebuilt plugin-first: configuration in
+> Dispatcharr where the platform supports it, official store plugins for generic mechanics, and one
+> small hand-written plugin for the policy that is ours. Start at [`docs/plan.md`](docs/plan.md)
+> and [`adr/0001`](adr/0001-rewrite-plugin-first.md). Everything below that describes `scripts/` is
+> the *current* (legacy) behaviour, frozen at tag `legacy/pre-rewrite-2026-11-07`.
+
 A self-hosted live-TV stack: two IPTV subscriptions feed **Dispatcharr**, which normalizes
 3,500+ raw channels into a curated lineup with a working guide, proxies every stream, and
 serves it to **Jellyfin** and a dedicated **Kodi** box. This repo holds the compose file,
@@ -91,8 +97,10 @@ Nightly Dispatcharr backups land in `./dispatcharr/data/backups/` — copy them 
 
 ## Further reading
 
-- **[`docs/reference.md`](docs/reference.md)** — the deep dive: why the EPG writes go to
-  `ChannelOverride`, why host networking, the wrong-fixture trap, Kodi/C-Vizio specifics,
-  exact verification commands for every subsystem.
-- **[`memory-bank/`](memory-bank/)** — the working log: `activeContext.md` (session
-  chronology), `decisions.md` (decision log with rationale), `progress.md` (done/pending).
+- **[`docs/README.md`](docs/README.md)** — the documentation index: platform capabilities,
+  target architecture, inventory/disposition, invariants, plan, and ADRs.
+- **[`docs/invariants.md`](docs/invariants.md)** — the provider/EPG/client facts that cost real
+  outages to learn. Read this before touching anything.
+- **[`docs/reference.md`](docs/reference.md)** — **legacy** (pre-rewrite) deep dive: root causes,
+  exact commands, gotchas. Kept as the runbook until Phase 5.
+- **[`memory-bank/`](memory-bank/)** — **legacy** session log from the pre-rewrite codebase.
